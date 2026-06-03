@@ -1,0 +1,18 @@
+services:
+  onboarding:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_TEST_MODE: "true"
+        NEXT_PUBLIC_APP_URL: "http://localhost:3001"
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env.local
+    environment:
+      # Docker-specific overrides (these take precedence over .env.local)
+      - DATABASE_PATH=/app/data/onboarding.db
+      - NEXT_PUBLIC_APP_URL=http://localhost:3001
+    restart: unless-stopped
