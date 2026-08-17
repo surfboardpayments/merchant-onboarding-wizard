@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Merchant Onboarding | Surfboard Payments",
+  title: "Get set up | Surfboard Payments",
   description:
-    "Get started accepting payments with Surfboard. Complete your merchant application in under 10 minutes.",
+    "Confirm your company details and start accepting payments with Surfboard. Most of it is filled in for you.",
 };
 
 export default function OnboardingLayout({

@@ -1,55 +1,53 @@
 export interface WizardStep {
   number: number;
+  /** Short name, used by the progress bar and assistive tech. */
   label: string;
-  description: string;
-  icon: string;
+  /** The page title, on the dark frame above the card. */
+  title: string;
+  /** One or two sentences under the title. Sets expectations, never repeats it. */
+  blurb: string;
   estimatedMinutes: number;
 }
 
+/**
+ * Three steps, not six.
+ *
+ * Nothing was dropped to get here: company + contact is step one, the old
+ * business and transaction steps merged into step two (they are the same
+ * subject: what you sell and how it shows up on a statement), and people,
+ * settlement and review merged into step three (who we pay and who vouches
+ * for it). Most of the fields underneath arrive pre-filled, so the merged
+ * steps read shorter than the six they replaced.
+ */
 export const WIZARD_STEPS: WizardStep[] = [
   {
     number: 1,
-    label: 'Company',
-    description: 'Your business identity',
-    icon: 'building',
-    estimatedMinutes: 0.5,
+    label: "Company",
+    title: "Let's find your business",
+    blurb:
+      "Start typing your company name. We'll pull your details straight from Companies House so you don't have to type them.",
+    estimatedMinutes: 1,
   },
   {
     number: 2,
-    label: 'Business',
-    description: 'Tell us about your business',
-    icon: 'store',
+    label: "Business",
+    title: "Tell us about your business",
+    blurb:
+      "We've filled in what we could find. Read it through, and change anything that doesn't sound right.",
     estimatedMinutes: 2,
   },
   {
     number: 3,
-    label: 'People',
-    description: 'Directors & owners',
-    icon: 'users',
+    label: "People and payouts",
+    title: "Owners and payouts",
+    blurb:
+      "Who's behind the business, and the account we should settle your money into.",
     estimatedMinutes: 3,
   },
-  {
-    number: 4,
-    label: 'Transactions',
-    description: 'Payment details',
-    icon: 'credit-card',
-    estimatedMinutes: 1,
-  },
-  {
-    number: 5,
-    label: 'Settlement',
-    description: 'Bank account',
-    icon: 'bank',
-    estimatedMinutes: 1,
-  },
-  {
-    number: 6,
-    label: 'Review',
-    description: 'Review & submit',
-    icon: 'check',
-    estimatedMinutes: 2,
-  },
 ];
+
+export const FIRST_STEP = 1;
+export const LAST_STEP = WIZARD_STEPS.length;
 
 /** Total estimated time across all wizard steps (in minutes). */
 export const TOTAL_ESTIMATED_MINUTES = WIZARD_STEPS.reduce(

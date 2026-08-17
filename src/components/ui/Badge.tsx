@@ -1,16 +1,13 @@
 import { cn } from "@/lib/utils/cn";
 
 const variantStyles = {
-  default:
-    "bg-muted text-muted-foreground",
-  success:
-    "bg-success-light text-success",
-  warning:
-    "bg-warning-light text-warning",
-  error:
-    "bg-error-light text-error",
-  info:
-    "bg-info-light text-info",
+  default: "bg-surface-sunk text-ink-muted",
+  success: "bg-ok-wash text-ok",
+  warning: "bg-warn-wash text-warn",
+  error: "bg-danger-wash text-danger",
+  info: "bg-accent-wash text-accent",
+  /** For counts and roles that should not compete with status. */
+  outline: "border border-line-strong text-ink-muted",
 } as const;
 
 type BadgeVariant = keyof typeof variantStyles;
@@ -25,9 +22,10 @@ function Badge({ variant = "default", children, className }: BadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5",
+        "text-xs font-medium leading-5 whitespace-nowrap",
         variantStyles[variant],
-        className
+        className,
       )}
     >
       {children}

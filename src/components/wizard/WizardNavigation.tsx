@@ -1,123 +1,119 @@
 "use client";
 
+import { useRef, useState } from "react";
+import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
 
 interface WizardNavigationProps {
   onNext: () => void;
   onPrev: () => void;
-  canGoNext: boolean;
   canGoPrev: boolean;
   isLastStep: boolean;
   isSubmitting?: boolean;
+  /**
+   * What is still missing, phrased for the merchant. When set, the primary
+   * action stays clickable and explains itself instead of sitting greyed out
+   * with no way to find out why.
+   */
+  blockedReason?: string | null;
 }
 
 export function WizardNavigation({
   onNext,
   onPrev,
-  canGoNext,
   canGoPrev,
   isLastStep,
   isSubmitting = false,
+  blockedReason = null,
 }: WizardNavigationProps) {
-  return (
-    <div className="flex items-center justify-between">
-      <button
-        type="button"
-        onClick={onPrev}
-        disabled={!canGoPrev}
-        className={cn(
-          "inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-lg transition-all",
-          canGoPrev
-            ? "text-foreground hover:bg-muted active:bg-muted/80"
-            : "text-muted-foreground/40 cursor-not-allowed"
-        )}
-      >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15 19l-7-7 7-7"
-          />
-        </svg>
-        Back
-      </button>
+  const [asked, setAsked] = useState(false);
+  const reasonRef = useRef<HTMLParagraphElement>(null);
 
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={!canGoNext || isSubmitting}
+  // Derived, not stored: the moment they fix the problem the nag disappears on
+  // its own, with no effect needed to chase the change.
+  const showReason = asked && !!blockedReason;
+
+  const handleNext = () => {
+    if (blockedReason) {
+      setAsked(true);
+      reasonRef.current?.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    onNext();
+  };
+
+  return (
+    <div className="mt-2 flex flex-col gap-4 border-t border-line pt-6">
+      {/* Stacks below sm: the primary action is wide enough on its own that a
+          side-by-side row overflows a 390px viewport. Reversed so the forward
+          action sits on top, in thumb reach, above the way back. */}
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        {canGoPrev ? (
+          <Button
+            variant="ghost"
+            size="md"
+            onClick={onPrev}
+            className="w-full sm:w-auto"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <path d="M13.5 8h-11M6.5 4l-4 4 4 4" />
+            </svg>
+            Back
+          </Button>
+        ) : (
+          <span />
+        )}
+
+        <Button
+          size="lg"
+          onClick={handleNext}
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          aria-describedby={showReason ? "wizard-blocked" : undefined}
+          className="w-full sm:w-auto"
+        >
+          {isSubmitting
+            ? "Sending your application"
+            : isLastStep
+              ? "Submit application"
+              : "Next step"}
+          {!isSubmitting && (
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <path d="M2.5 8h11M9.5 4l4 4-4 4" />
+            </svg>
+          )}
+        </Button>
+      </div>
+
+      <p
+        id="wizard-blocked"
+        ref={reasonRef}
+        aria-live="polite"
         className={cn(
-          "inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium rounded-lg transition-all",
-          canGoNext && !isSubmitting
-            ? "bg-foreground text-primary-foreground hover:bg-foreground/90 active:bg-foreground/80 shadow-sm"
-            : "bg-muted text-muted-foreground cursor-not-allowed"
+          "text-sm text-danger sm:text-right",
+          showReason ? "block" : "hidden",
         )}
       >
-        {isSubmitting ? (
-          <>
-            <svg
-              className="animate-spin w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-            Submitting...
-          </>
-        ) : isLastStep ? (
-          <>
-            Submit Application
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </>
-        ) : (
-          <>
-            Continue
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
-          </>
-        )}
-      </button>
+        {blockedReason}
+      </p>
     </div>
   );
 }

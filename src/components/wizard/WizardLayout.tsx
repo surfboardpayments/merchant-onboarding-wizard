@@ -1,14 +1,14 @@
 "use client";
 
-import { ReactNode, useState } from "react";
-import { WizardStepper } from "./WizardStepper";
+import { useState, type ReactNode } from "react";
+import { ProgressSegments } from "./ProgressSegments";
 import { WizardNavigation } from "./WizardNavigation";
-import { TimeEstimate } from "./TimeEstimate";
 import { SaveIndicator } from "./SaveIndicator";
-import { SurfboardLogo } from "@/components/ui/SurfboardLogo";
+import { PoweredBySurfboard } from "@/components/ui/SurfboardLogo";
 import { Modal } from "@/components/ui/Modal";
+import { DemoBanner } from "@/components/ui/DemoBanner";
 import { Button } from "@/components/ui/Button";
-import { WIZARD_STEPS } from "@/lib/constants/wizardSteps";
+import { WIZARD_STEPS, LAST_STEP } from "@/lib/constants/wizardSteps";
 
 interface WizardLayoutProps {
   currentStep: number;
@@ -17,7 +17,7 @@ interface WizardLayoutProps {
   onPrev: () => void;
   onStepClick?: (step: number) => void;
   onStartOver?: () => void;
-  canGoNext: boolean;
+  blockedReason?: string | null;
   canGoPrev: boolean;
   isSubmitting?: boolean;
   isSaving?: boolean;
@@ -31,108 +31,86 @@ export function WizardLayout({
   onPrev,
   onStepClick,
   onStartOver,
-  canGoNext,
+  blockedReason = null,
   canGoPrev,
   isSubmitting = false,
   isSaving = false,
   lastSaved = null,
 }: WizardLayoutProps) {
-  const isLastStep = currentStep === WIZARD_STEPS.length;
-  const [showStartOverModal, setShowStartOverModal] = useState(false);
+  const [showStartOver, setShowStartOver] = useState(false);
+  const step = WIZARD_STEPS[currentStep - 1] ?? WIZARD_STEPS[0];
+  const isLastStep = currentStep === LAST_STEP;
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      {/* Test mode banner */}
-      {process.env.NEXT_PUBLIC_TEST_MODE === "true" && (
-        <div className="bg-amber-500 text-white text-xs text-center py-1.5 font-medium tracking-wide">
-          DEMO MODE — Emails displayed on screen instead of being sent
-        </div>
-      )}
+    <div className="frame-ground min-h-dvh">
+      <DemoBanner>Demo mode: emails appear on screen, nothing is sent</DemoBanner>
 
-      {/* Start Over confirmation modal */}
       <Modal
-        open={showStartOverModal}
-        onClose={() => setShowStartOverModal(false)}
+        open={showStartOver}
+        onClose={() => setShowStartOver(false)}
         title="Start over?"
+        description="This clears everything you've entered so far, including details we looked up for you. It can't be undone."
       >
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            This will clear all your progress and data. You&apos;ll need to start the application from scratch. This action cannot be undone.
-          </p>
-          <div className="flex items-center justify-end gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowStartOverModal(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setShowStartOverModal(false);
-                onStartOver?.();
-              }}
-              className="bg-error hover:bg-error/90 active:bg-error/80"
-            >
-              Clear everything
-            </Button>
-          </div>
+        <div className="flex items-center justify-end gap-3">
+          <Button variant="ghost" size="md" onClick={() => setShowStartOver(false)}>
+            Keep my progress
+          </Button>
+          <Button
+            variant="danger"
+            size="md"
+            onClick={() => {
+              setShowStartOver(false);
+              onStartOver?.();
+            }}
+          >
+            Clear everything
+          </Button>
         </div>
       </Modal>
 
-      {/* Header - dark Surfboard branded */}
-      <header className="bg-header-bg sticky top-0 z-50">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <SurfboardLogo variant="white" size={28} />
-
-            <div className="flex items-center gap-4">
-              <SaveIndicator isSaving={isSaving} lastSaved={lastSaved} variant="dark" />
-              <TimeEstimate currentStep={currentStep} variant="dark" />
-              <button
-                type="button"
-                onClick={() => setShowStartOverModal(true)}
-                className="text-xs font-medium text-white/70 hover:text-white transition-colors cursor-pointer border border-white/20 rounded px-2.5 py-1 hover:border-white/40"
-              >
-                Clear everything
-              </button>
-            </div>
-          </div>
+      <div className="mx-auto flex min-h-dvh max-w-3xl flex-col px-5 sm:px-8">
+        {/* Utility row. Deliberately quiet: it is reassurance, not navigation. */}
+        <div data-on-frame className="flex min-h-14 items-center justify-between gap-4 pt-3">
+          <SaveIndicator isSaving={isSaving} lastSaved={lastSaved} />
+          <button
+            type="button"
+            onClick={() => setShowStartOver(true)}
+            className="-mr-2 cursor-pointer rounded-[var(--radius-xs)] px-2 py-2.5 text-xs text-on-frame-faint underline decoration-transparent underline-offset-4 transition-colors duration-[var(--dur-tap)] ease-[var(--ease-out)] hover:text-on-frame-muted hover:decoration-current"
+          >
+            Start over
+          </button>
         </div>
-      </header>
 
-      {/* Stepper */}
-      <div className="bg-white border-b border-border">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-4">
-          <WizardStepper
-            steps={WIZARD_STEPS}
+        <header data-on-frame className="pb-8 pt-6 sm:pt-10">
+          <h1 className="tracking-display font-display text-2xl font-semibold text-on-frame sm:text-3xl">
+            {step.title}
+          </h1>
+          <p className="mt-4 max-w-[54ch] text-md leading-relaxed text-on-frame-muted">
+            {step.blurb}
+          </p>
+          <ProgressSegments
             currentStep={currentStep}
             onStepClick={onStepClick}
+            className="mt-8"
           />
-        </div>
-      </div>
+        </header>
 
-      {/* Content */}
-      <main className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-xl shadow-sm border border-border p-6 sm:p-8">
-          {children}
-        </div>
-      </main>
+        <main className="rounded-[var(--radius-xl)] bg-surface p-6 shadow-[var(--shadow-card)] sm:p-9">
+          <div className="flex flex-col gap-9">
+            {children}
+            <WizardNavigation
+              onNext={onNext}
+              onPrev={onPrev}
+              canGoPrev={canGoPrev}
+              isLastStep={isLastStep}
+              isSubmitting={isSubmitting}
+              blockedReason={blockedReason}
+            />
+          </div>
+        </main>
 
-      {/* Navigation */}
-      <div className="sticky bottom-0 border-t border-border bg-white/90 backdrop-blur-sm">
-        <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-4">
-          <WizardNavigation
-            onNext={onNext}
-            onPrev={onPrev}
-            canGoNext={canGoNext}
-            canGoPrev={canGoPrev}
-            isLastStep={isLastStep}
-            isSubmitting={isSubmitting}
-          />
+        <div className="mt-auto">
+          <PoweredBySurfboard />
         </div>
       </div>
     </div>

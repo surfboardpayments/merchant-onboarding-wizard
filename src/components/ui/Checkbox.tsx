@@ -1,72 +1,84 @@
 "use client";
 
-import { forwardRef, useId, type InputHTMLAttributes } from "react";
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
+import { FieldMessage } from "./Input";
 
 export interface CheckboxProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "size"> {
-  label?: string;
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "size" | "children"> {
+  label?: ReactNode;
+  description?: ReactNode;
   error?: string;
 }
 
 const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, label, error, id, ...props }, ref) => {
+  ({ className, label, description, error, id, ...props }, ref) => {
     const generatedId = useId();
     const checkboxId = id ?? generatedId;
     const errorId = error ? `${checkboxId}-error` : undefined;
+    const descId = description ? `${checkboxId}-desc` : undefined;
+    const describedBy = [errorId, descId].filter(Boolean).join(" ") || undefined;
 
     return (
       <div className="flex flex-col gap-1">
-        <label
-          htmlFor={checkboxId}
-          className="flex cursor-pointer items-start gap-2.5"
-        >
-          <div className="relative mt-0.5 flex shrink-0 items-center justify-center">
+        <div className="group flex items-start gap-3">
+          <span className="relative flex shrink-0 items-center justify-center">
             <input
               ref={ref}
               type="checkbox"
               id={checkboxId}
               className={cn(
-                "peer h-4 w-4 cursor-pointer appearance-none rounded-[var(--radius-sm)] border-2 transition-colors duration-150",
-                "checked:border-primary checked:bg-primary",
-                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                "disabled:cursor-not-allowed disabled:opacity-50",
-                error ? "border-error" : "border-border",
-                className
+                "peer h-5 w-5 cursor-pointer appearance-none rounded-[var(--radius-xs)] border",
+                "bg-surface transition-[background-color,border-color] duration-[var(--dur-tap)] ease-[var(--ease-out)]",
+                "hover:border-accent",
+                "checked:border-accent checked:bg-accent",
+                "disabled:cursor-not-allowed disabled:opacity-45",
+                error ? "border-danger" : "border-field-line",
+                className,
               )}
               aria-invalid={error ? true : undefined}
-              aria-describedby={errorId}
+              aria-describedby={describedBy}
               {...props}
             />
-            {/* Checkmark icon */}
             <svg
-              xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
-              fill="currentColor"
-              className="pointer-events-none absolute h-3 w-3 text-primary-foreground opacity-0 peer-checked:opacity-100"
+              fill="none"
+              stroke="white"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="pointer-events-none absolute h-3.5 w-3.5 scale-75 opacity-0 transition-[opacity,transform] duration-[var(--dur-tap)] ease-[var(--ease-out)] peer-checked:scale-100 peer-checked:opacity-100"
               aria-hidden="true"
             >
-              <path
-                fillRule="evenodd"
-                d="M12.416 3.376a.75.75 0 01.208 1.04l-5 7.5a.75.75 0 01-1.154.114l-3-3a.75.75 0 011.06-1.06l2.353 2.353 4.493-6.739a.75.75 0 011.04-.208z"
-                clipRule="evenodd"
-              />
+              <path d="m3 8.5 3.2 3.2L13 4.8" />
             </svg>
-          </div>
-          {label && (
-            <span className="text-sm text-foreground select-none">
-              {label}
+          </span>
+          {(label || description) && (
+            <span className="min-w-0 flex-1">
+              {label && (
+                <label
+                  htmlFor={checkboxId}
+                  className="block cursor-pointer text-base leading-snug text-ink"
+                >
+                  {label}
+                </label>
+              )}
+              {description && (
+                <p id={descId} className="mt-1 text-sm leading-snug text-ink-muted">
+                  {description}
+                </p>
+              )}
             </span>
           )}
-        </label>
+        </div>
         {error && (
-          <p id={errorId} className="ml-6.5 text-xs text-error" role="alert">
+          <FieldMessage id={errorId} tone="error">
             {error}
-          </p>
+          </FieldMessage>
         )}
       </div>
     );
-  }
+  },
 );
 
 Checkbox.displayName = "Checkbox";

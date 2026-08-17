@@ -533,6 +533,10 @@ export async function autofillWithGemini(
   const generationConfig: Record<string, unknown> = {
     temperature: 0.1,
     maxOutputTokens: 2048,
+    // The flash alias now points at a reasoning model, whose thinking tokens
+    // count against maxOutputTokens and roughly triple latency. This is a
+    // lookup-and-format job, not a reasoning one, so keep thinking minimal.
+    thinkingConfig: { thinkingLevel: "low" },
   };
 
   if (!needsWebSearch) {
@@ -556,14 +560,21 @@ export async function autofillWithGemini(
     body.tools = [{ googleSearch: {} }];
   }
 
+  // Web-search-grounded calls need time for the search as well as generation.
+  // Autofill is fire-and-forget in the background, so a generous ceiling costs
+  // the merchant nothing while a tight one throws away the whole result.
+  // Declared outside the try so the abort handler can name it.
+  const timeoutMs = needsWebSearch ? 30000 : 12000;
+
   try {
     const controller = new AbortController();
-    // Web-search-grounded calls need more time (search + generation)
-    const timeoutMs = needsWebSearch ? 15000 : 8000;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      // The auto-updating alias, as documented at the top of this file. The
+      // pinned gemini-2.0-flash it had drifted to is retired and returns 404,
+      // which made autofill fail silently and fill nothing.
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -607,7 +618,7 @@ export async function autofillWithGemini(
     return fieldCount > 0 ? result : null;
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      console.warn("[Gemini] Request timed out (8s)");
+      console.warn(`[Gemini] Request timed out after ${timeoutMs}ms`);
     } else {
       console.error("[Gemini] Autofill error:", err);
     }

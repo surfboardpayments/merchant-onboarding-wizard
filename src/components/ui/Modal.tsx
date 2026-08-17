@@ -1,150 +1,123 @@
 "use client";
 
-import { useEffect, useRef, useCallback, type ReactNode } from "react";
-import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
 
 export interface ModalProps {
   open: boolean;
   onClose: () => void;
   title?: string;
+  description?: string;
   children: ReactNode;
+  /** `md` for confirmations, `lg` for previews and long content. */
+  size?: "md" | "lg";
   className?: string;
 }
 
-const overlayVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-};
-
-const contentVariants: Variants = {
-  hidden: {
-    opacity: 0,
-    scale: 0.95,
-    y: 10,
-  },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: {
-      type: "spring" as const,
-      damping: 25,
-      stiffness: 300,
-    },
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.95,
-    y: 10,
-    transition: {
-      duration: 0.15,
-    },
-  },
-};
-
-function Modal({ open, onClose, title, children, className }: ModalProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+/**
+ * Native <dialog>, so focus trapping, Escape, inert background and the top
+ * layer all come from the platform rather than from JavaScript we'd have to
+ * keep correct ourselves.
+ */
+export function Modal({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  size = "md",
+  className,
+}: ModalProps) {
+  const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
-    const dialog = dialogRef.current;
+    const dialog = ref.current;
     if (!dialog) return;
 
-    if (open) {
-      if (!dialog.open) {
-        dialog.showModal();
-      }
-    } else {
+    if (open && !dialog.open) {
+      dialog.showModal();
+    } else if (!open && dialog.open) {
       dialog.close();
     }
   }, [open]);
 
-  const handleBackdropClick = useCallback(
-    (e: React.MouseEvent<HTMLDialogElement>) => {
-      if (e.target === dialogRef.current) {
-        onClose();
-      }
-    },
-    [onClose]
-  );
+  // Escape and the backdrop both fire `close`; keep React state in step.
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    },
-    [onClose]
-  );
+    const handleClose = () => onClose();
+    dialog.addEventListener("close", handleClose);
+    return () => dialog.removeEventListener("close", handleClose);
+  }, [onClose]);
 
   return (
-    <AnimatePresence>
-      {open && (
-        <dialog
-          ref={dialogRef}
-          onClick={handleBackdropClick}
-          onKeyDown={handleKeyDown}
-          onCancel={(e) => {
-            e.preventDefault();
-            onClose();
-          }}
-          className="fixed inset-0 z-50 m-0 h-full w-full max-h-full max-w-full bg-transparent p-0 backdrop:hidden overflow-y-auto"
-          aria-modal="true"
-        >
-          <motion.div
-            variants={overlayVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 bg-foreground/40 backdrop-blur-sm"
-            aria-hidden="true"
-          />
-          <div className="flex min-h-full items-center justify-center p-4">
-            <motion.div
-              variants={contentVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className={cn(
-                "relative z-10 w-full max-w-lg rounded-[var(--radius-lg)] bg-background p-6 shadow-[var(--shadow-lg)]",
-                className
-              )}
-              role="document"
-            >
-              {title && (
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="font-heading text-lg font-semibold text-foreground">
-                    {title}
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
-                    aria-label="Close dialog"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="h-5 w-5"
-                      aria-hidden="true"
-                    >
-                      <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-              {children}
-            </motion.div>
-          </div>
-        </dialog>
+    <dialog
+      ref={ref}
+      aria-labelledby={title ? "modal-title" : undefined}
+      aria-describedby={description ? "modal-description" : undefined}
+      onClick={(event) => {
+        // Clicks that land on the dialog element itself are backdrop clicks.
+        if (event.target === ref.current) onClose();
+      }}
+      className={cn(
+        "m-auto w-[calc(100vw-2rem)] rounded-[var(--radius-lg)] bg-surface p-0 text-ink",
+        "shadow-[var(--shadow-card)] backdrop:bg-frame/70 backdrop:backdrop-blur-[2px]",
+        "open:animate-fade",
+        size === "lg" ? "max-w-2xl" : "max-w-md",
+        className,
       )}
-    </AnimatePresence>
+    >
+      <div className="flex max-h-[85vh] flex-col">
+        {(title || description) && (
+          <div className="flex items-start gap-4 border-b border-line px-6 pb-4 pt-5">
+            <div className="min-w-0 flex-1">
+              {title && (
+                <h2
+                  id="modal-title"
+                  className="font-display text-lg font-semibold tracking-[-0.02em] text-ink"
+                >
+                  {title}
+                </h2>
+              )}
+              {description && (
+                <p
+                  id="modal-description"
+                  className="mt-1 text-sm leading-relaxed text-ink-muted"
+                >
+                  {description}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={cn(
+                "-mr-2 -mt-1 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center",
+                "rounded-[var(--radius-xs)] text-ink-muted",
+                "transition-colors duration-[var(--dur-tap)] ease-[var(--ease-out)]",
+                "hover:bg-surface-sunk hover:text-ink",
+              )}
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                aria-hidden="true"
+                className="h-4 w-4"
+              >
+                <path d="m4 4 8 8M12 4l-8 8" />
+              </svg>
+            </button>
+          </div>
+        )}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+      </div>
+    </dialog>
   );
 }
 
-Modal.displayName = "Modal";
-
-export { Modal };
+export default Modal;
