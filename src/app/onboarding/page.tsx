@@ -1,19 +1,38 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useOnboardingStore } from "@/store/onboardingStore";
 import { WizardLayout } from "@/components/wizard/WizardLayout";
 import { StepContainer } from "@/components/wizard/StepContainer";
-import { WIZARD_STEPS } from "@/lib/constants/wizardSteps";
-import { Step1CompanyLookup } from "@/components/steps/Step1CompanyLookup";
-import { Step2BusinessDetails } from "@/components/steps/Step2BusinessDetails";
-import { Step3People } from "@/components/steps/Step3People";
-import Step4Transactions from "@/components/steps/Step4Transactions";
-import Step5Settlement from "@/components/steps/Step5Settlement";
-import Step6Review from "@/components/steps/Step6Review";
+import { FIRST_STEP, LAST_STEP } from "@/lib/constants/wizardSteps";
+import { StepCompany } from "@/components/steps/StepCompany";
+import { StepBusiness } from "@/components/steps/StepBusiness";
+import { StepPeopleAndPayouts } from "@/components/steps/StepPeopleAndPayouts";
+
+/** Loading skeleton that matches the real layout, so nothing jumps on hydrate. */
+function BootSkeleton() {
+  return (
+    <div className="frame-ground min-h-dvh">
+      <div className="mx-auto max-w-3xl px-5 sm:px-8">
+        <div className="h-14" />
+        <div className="pb-8 pt-6 sm:pt-10">
+          <div className="h-10 w-2/3 animate-pulse rounded bg-on-frame/10" />
+          <div className="mt-5 h-4 w-full max-w-lg animate-pulse rounded bg-on-frame/[0.07]" />
+          <div className="mt-10 flex gap-2">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-1.5 flex-1 rounded-full bg-on-frame-line" />
+            ))}
+          </div>
+        </div>
+        <div className="h-96 rounded-[var(--radius-xl)] bg-surface shadow-[var(--shadow-card)]" />
+      </div>
+    </div>
+  );
+}
 
 export default function OnboardingPage() {
   const {
+    id: applicationId,
     currentStep,
     setCurrentStep,
     company,
@@ -22,24 +41,22 @@ export default function OnboardingPage() {
     transactions,
     settlement,
     consent,
+    contactEmail,
     updateConsent,
     resetApplication,
   } = useOnboardingStore();
 
-  const [direction, setDirection] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Handle Zustand hydration from localStorage
   useEffect(() => {
-    // Trigger rehydration
     useOnboardingStore.persist.rehydrate();
     setIsHydrated(true);
   }, []);
 
-  // Auto-save indicator
   useEffect(() => {
     if (!isHydrated) return;
     setIsSaving(true);
@@ -48,168 +65,137 @@ export default function OnboardingPage() {
       setLastSaved(new Date());
     }, 500);
     return () => clearTimeout(timeout);
-  }, [company, business, people, transactions, settlement, isHydrated]);
+  }, [company, business, people, transactions, settlement, consent, isHydrated]);
 
   const goToStep = useCallback(
     (step: number) => {
-      if (step >= 1 && step <= WIZARD_STEPS.length) {
-        setDirection(step > currentStep ? 1 : -1);
-        setCurrentStep(step);
-      }
+      if (step >= FIRST_STEP && step <= LAST_STEP) setCurrentStep(step);
     },
-    [currentStep, setCurrentStep]
+    [setCurrentStep],
   );
 
-  const nextStep = useCallback(() => {
-    goToStep(currentStep + 1);
-  }, [currentStep, goToStep]);
-
-  const prevStep = useCallback(() => {
-    goToStep(currentStep - 1);
-  }, [currentStep, goToStep]);
-
-  // Basic validation per step
-  const canGoNext = useCallback(() => {
+  /**
+   * What is still missing, in the merchant's words. Returning a sentence rather
+   * than a boolean lets the Next button say why instead of going grey.
+   */
+  const blockedReason = useMemo((): string | null => {
     switch (currentStep) {
-      case 1:
-        // Limited company: need company number + name (from lookup)
-        // Sole trader: need trading name + UTR (manual entry)
-        return !!(company?.companyNumber && company?.companyName);
-      case 2:
-        return !!(business?.businessType && business?.merchantDba);
-      case 3:
-        return people.length > 0;
-      case 4:
-        return !!(transactions?.transactionDescriptor);
-      case 5:
-        return !!(
-          settlement?.sortCode &&
-          settlement?.accountNumber &&
-          settlement?.nameOnAccount
-        );
-      case 6:
-        return !!(consent?.termsAccepted && consent?.privacyPolicyAccepted);
+      case 1: {
+        if (!company.companyNumber || !company.companyName) {
+          return company.entityType === "sole_trader"
+            ? "Add your trading name and UTR number to carry on."
+            : "Search for your company and pick it from the list to carry on.";
+        }
+        if (company.companyStatus && company.companyStatus !== "active") {
+          return "We can only onboard companies that are active at Companies House.";
+        }
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail)) {
+          return "Add an email address we can reach you on.";
+        }
+        return null;
+      }
+      case 2: {
+        if (!business.merchantDba) return "Tell us the name you trade under.";
+        if (!business.businessType) return "Tell us whether you sell in person, online, or both.";
+        if (!business.productsDescription) return "Tell us what your business sells.";
+        if (!transactions.transactionDescriptor) {
+          return "Set what your customers will see on their bank statement.";
+        }
+        return null;
+      }
+      case 3: {
+        if (people.length === 0) return "Add at least one director or owner.";
+        if (!transactions.pepSanctionsConsent) {
+          return "We need your agreement to screen the people listed above.";
+        }
+        if (!settlement.nameOnAccount) return "Add the name on your bank account.";
+        if ((settlement.sortCode ?? "").replace(/\D/g, "").length !== 6) {
+          return "Add a six-digit sort code.";
+        }
+        if ((settlement.accountNumber ?? "").length !== 8) {
+          return "Add an eight-digit account number.";
+        }
+        if (!consent.termsAccepted || !consent.privacyPolicyAccepted) {
+          return "Accept the terms and the privacy policy to send your application.";
+        }
+        return null;
+      }
       default:
-        return false;
+        return null;
     }
-  }, [currentStep, company, business, people, transactions, settlement, consent]);
+  }, [currentStep, company, business, people, transactions, settlement, consent, contactEmail]);
 
   const handleSubmit = async () => {
-    if (currentStep !== WIZARD_STEPS.length) {
-      nextStep();
+    if (currentStep !== LAST_STEP) {
+      goToStep(currentStep + 1);
       return;
     }
 
     setIsSubmitting(true);
+    setSubmitError(null);
+
     try {
-      const applicationData = useOnboardingStore.getState();
+      const state = useOnboardingStore.getState();
       const response = await fetch("/api/applications/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          company: applicationData.company,
-          business: applicationData.business,
-          people: applicationData.people,
-          transactions: applicationData.transactions,
-          settlement: applicationData.settlement,
-          consent: applicationData.consent,
-          contactEmail: applicationData.contactEmail,
-          contactPhone: applicationData.contactPhone,
+          company: state.company,
+          business: state.business,
+          people: state.people,
+          transactions: state.transactions,
+          settlement: state.settlement,
+          consent: state.consent,
+          contactEmail: state.contactEmail,
+          contactPhone: state.contactPhone,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Submission failed");
-      }
+      if (!response.ok) throw new Error("Submission failed");
 
       const result = await response.json();
-      // Store reference number and navigate to confirmation
       updateConsent({ submittedAt: new Date().toISOString() });
 
-      // Store confirmation email HTML for test mode display
       if (result.confirmationEmailHtml) {
         try {
           sessionStorage.setItem("confirmationEmailHtml", result.confirmationEmailHtml);
-        } catch { /* ignore storage errors */ }
+        } catch {
+          /* private browsing; the confirmation page copes without it */
+        }
       }
 
       window.location.href = `/onboarding/confirmation?ref=${result.referenceNumber}`;
     } catch (error) {
       console.error("Submission error:", error);
-      alert("Failed to submit application. Please try again.");
-    } finally {
+      setSubmitError(
+        "We couldn't send your application just then. Your answers are saved, so try again in a moment.",
+      );
       setIsSubmitting(false);
     }
   };
 
-  const handleEditStep = useCallback(
-    (step: number) => {
-      goToStep(step);
-    },
-    [goToStep]
-  );
-
-  const handleStartOver = useCallback(() => {
-    resetApplication();
-    setDirection(0);
-    setLastSaved(null);
-  }, [resetApplication]);
-
-  // Don't render until hydrated (prevents flash of empty state)
-  if (!isHydrated) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse flex items-center gap-3">
-          <div className="w-8 h-8 bg-muted rounded-lg" />
-          <div className="h-5 w-32 bg-muted rounded" />
-        </div>
-      </div>
-    );
-  }
-
-  const renderStep = () => {
-    switch (currentStep) {
-      case 1:
-        return <Step1CompanyLookup />;
-      case 2:
-        return <Step2BusinessDetails />;
-      case 3:
-        return <Step3People />;
-      case 4:
-        return <Step4Transactions />;
-      case 5:
-        return <Step5Settlement />;
-      case 6:
-        return <Step6Review onEditStep={handleEditStep} />;
-      default:
-        return <Step1CompanyLookup />;
-    }
-  };
-
-  const stepMeta = WIZARD_STEPS[currentStep - 1];
+  if (!isHydrated) return <BootSkeleton />;
 
   return (
     <WizardLayout
       currentStep={currentStep}
       onNext={handleSubmit}
-      onPrev={prevStep}
-      onStepClick={(step) => {
-        if (step < currentStep) goToStep(step);
-      }}
-      onStartOver={handleStartOver}
-      canGoNext={canGoNext()}
-      canGoPrev={currentStep > 1}
+      onPrev={() => goToStep(currentStep - 1)}
+      onStepClick={(step) => step < currentStep && goToStep(step)}
+      onStartOver={resetApplication}
+      blockedReason={submitError ?? blockedReason}
+      canGoPrev={currentStep > FIRST_STEP}
       isSubmitting={isSubmitting}
       isSaving={isSaving}
       lastSaved={lastSaved}
     >
-      <StepContainer
-        stepKey={currentStep}
-        direction={direction}
-        title={stepMeta?.label || ""}
-        description={stepMeta?.description || ""}
-      >
-        {renderStep()}
+      {/* Keyed on the application id as well as the step: starting over mints a
+          new id, which remounts the steps and clears local field state that
+          lives outside the store, such as the company search box. */}
+      <StepContainer stepKey={`${applicationId}-${currentStep}`}>
+        {currentStep === 1 && <StepCompany />}
+        {currentStep === 2 && <StepBusiness />}
+        {currentStep === 3 && <StepPeopleAndPayouts onEditStep={goToStep} />}
       </StepContainer>
     </WizardLayout>
   );

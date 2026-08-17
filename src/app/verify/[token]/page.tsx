@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
-import { motion } from "framer-motion";
+import { use, useEffect, useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { Alert } from "@/components/ui/Alert";
 import { PhoneInput } from "@/components/form/PhoneInput";
 import { DateOfBirthInput } from "@/components/form/DateOfBirthInput";
 import { AddressInput } from "@/components/form/AddressInput";
-import { SurfboardLogo } from "@/components/ui/SurfboardLogo";
+import { PoweredBySurfboard } from "@/components/ui/SurfboardLogo";
+import { birthPhrase } from "@/lib/utils/prose";
 
 interface PersonData {
   firstName: string;
@@ -28,8 +26,19 @@ interface PersonData {
   };
 }
 
-type VerifyStep = "loading" | "form" | "submitting" | "complete" | "expired" | "error";
+type VerifyStep =
+  | "loading"
+  | "form"
+  | "submitting"
+  | "complete"
+  | "expired"
+  | "error";
 
+/**
+ * What an invited director or owner sees. They arrive cold from an email with
+ * no idea who Surfboard is, so the page leads with who is asking, why, and how
+ * long it takes, before it asks for a date of birth.
+ */
 export default function VerifyPage({
   params,
 }: {
@@ -37,9 +46,11 @@ export default function VerifyPage({
 }) {
   const { token } = use(params);
   const [step, setStep] = useState<VerifyStep>("loading");
-  const [personData, setPersonData] = useState<PersonData | null>(null);
-  const [formData, setFormData] = useState({
+  const [person, setPerson] = useState<PersonData | null>(null);
+  const [form, setForm] = useState({
     dayOfBirth: undefined as number | undefined,
+    monthOfBirth: undefined as number | undefined,
+    yearOfBirth: undefined as number | undefined,
     phone: "",
     email: "",
     address: {
@@ -52,25 +63,18 @@ export default function VerifyPage({
     },
   });
 
-  // Load invite data
   useEffect(() => {
     async function loadInvite() {
       try {
         const response = await fetch(`/api/invite/${token}`);
         if (!response.ok) {
-          if (response.status === 410) {
-            setStep("expired");
-            return;
-          }
-          throw new Error("Failed to load invite");
+          setStep(response.status === 410 ? "expired" : "error");
+          return;
         }
         const data = await response.json();
-        setPersonData(data.person);
+        setPerson(data.person);
         if (data.person.address) {
-          setFormData((prev) => ({
-            ...prev,
-            address: data.person.address,
-          }));
+          setForm((prev) => ({ ...prev, address: data.person.address }));
         }
         setStep("form");
       } catch {
@@ -87,217 +91,259 @@ export default function VerifyPage({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          dayOfBirth: formData.dayOfBirth,
-          phone: formData.phone,
-          email: formData.email,
-          address: formData.address,
+          dayOfBirth: form.dayOfBirth,
+          monthOfBirth: person?.dateOfBirth?.month ?? form.monthOfBirth,
+          yearOfBirth: person?.dateOfBirth?.year ?? form.yearOfBirth,
+          phone: form.phone,
+          email: form.email,
+          address: form.address,
         }),
       });
 
       if (!response.ok) {
-        if (response.status === 410) {
-          setStep("expired");
-          return;
-        }
-        throw new Error("Failed to submit details");
+        setStep(response.status === 410 ? "expired" : "error");
+        return;
       }
-
       setStep("complete");
     } catch {
       setStep("error");
     }
   };
 
-  if (step === "loading") {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse flex flex-col items-center gap-3">
-          <div className="w-12 h-12 bg-muted rounded-xl" />
-          <div className="h-4 w-48 bg-muted rounded" />
-        </div>
-      </div>
-    );
-  }
+  /** True when the public register already told us the month and year. */
+  const knownBirthMonthYear = Boolean(
+    person?.dateOfBirth?.month && person?.dateOfBirth?.year,
+  );
 
-  if (step === "expired") {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center">
-          <div className="mx-auto w-16 h-16 bg-warning-light rounded-full flex items-center justify-center mb-4">
-            <svg className="w-8 h-8 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <circle cx="12" cy="12" r="10" />
-              <path strokeLinecap="round" d="M12 6v6l4 2" />
-            </svg>
-          </div>
-          <h1 className="font-heading text-2xl font-semibold mb-2">Link Expired</h1>
-          <p className="text-muted-foreground">
-            This invite link has expired. Please ask the person who sent
-            it to resend a new invite.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const missing =
+    !form.dayOfBirth ||
+    (!knownBirthMonthYear && (!form.monthOfBirth || !form.yearOfBirth)) ||
+    !form.phone ||
+    !form.email ||
+    !form.address.addressLine1;
 
-  if (step === "error") {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center">
-          <Alert
-            variant="error"
-            title="Something went wrong"
-            description="We couldn't load this invite. Please try again or contact support."
-          />
-        </div>
-      </div>
-    );
-  }
-
-  if (step === "complete") {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md w-full text-center"
-        >
-          <div className="mx-auto w-16 h-16 bg-success-light rounded-full flex items-center justify-center mb-4">
-            <svg className="w-8 h-8 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h1 className="font-heading text-2xl font-semibold mb-2">
-            Details Submitted
-          </h1>
-          <p className="text-muted-foreground">
-            Thank you, {personData?.firstName}. Your details have been submitted.
-            You can close this page.
-          </p>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // Main form
   return (
-    <div className="min-h-screen bg-background">
-      {/* Simple header */}
-      <header className="bg-header-bg">
-        <div className="mx-auto max-w-lg px-4 py-4">
-          <SurfboardLogo variant="white" size={24} />
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-lg px-4 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          {/* Greeting */}
-          <div className="mb-8">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight mb-2">
-              Hi {personData?.firstName}, complete your details
-            </h1>
-            <p className="text-muted-foreground">
-              <strong>{personData?.companyName}</strong> is onboarding with
-              Surfboard Payments. As a director or beneficial owner, we need a
-              few of your personal details.
-            </p>
-            <div className="mt-3">
-              <Badge variant="info">Takes about 2-3 minutes</Badge>
-            </div>
+    <div className="frame-ground flex min-h-dvh flex-col">
+      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col px-5 py-10 sm:px-8">
+        {step === "loading" && (
+          <div className="flex flex-1 flex-col justify-center gap-6">
+            <div className="h-8 w-3/4 animate-pulse rounded bg-on-frame/10" />
+            <div className="h-64 animate-pulse rounded-[var(--radius-xl)] bg-surface/90" />
           </div>
+        )}
 
-          {/* Pre-filled info */}
-          <div className="bg-muted/50 rounded-xl p-4 mb-6 border border-border/50">
-            <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">
-              Information we have
-            </p>
-            <div className="space-y-1">
-              <p className="text-sm font-medium">
-                {personData?.firstName} {personData?.middleName}{" "}
-                {personData?.lastName}
+        {step === "expired" && (
+          <Outcome
+            tone="warn"
+            title="This link has expired"
+            body="Invite links last seven days. Ask whoever sent it to send you a fresh one and it'll work straight away."
+          />
+        )}
+
+        {step === "error" && (
+          <Outcome
+            tone="danger"
+            title="We couldn't open this invite"
+            body={
+              <>
+                Try the link again in a minute. If it still doesn&apos;t work,
+                email{" "}
+                <a
+                  href="mailto:support@surfboardpayments.com"
+                  className="text-accent underline decoration-accent/35 underline-offset-4 hover:decoration-accent/70"
+                >
+                  support@surfboardpayments.com
+                </a>{" "}
+                and we&apos;ll sort it out.
+              </>
+            }
+          />
+        )}
+
+        {step === "complete" && (
+          <Outcome
+            tone="ok"
+            title={`Thanks${person?.firstName ? `, ${person.firstName}` : ""}`}
+            body={`Your details are with ${person?.companyName || "the business"}'s application. Nothing else is needed from you, and you can close this page.`}
+          />
+        )}
+
+        {(step === "form" || step === "submitting") && (
+          <>
+            <header className="pb-8">
+              <h1 className="tracking-display font-display text-2xl font-semibold text-on-frame sm:text-3xl">
+                {person?.firstName ? `Hi ${person.firstName},` : "Hello,"} we need
+                three things from you
+              </h1>
+              <p className="mt-4 max-w-[54ch] text-md leading-relaxed text-on-frame-muted">
+                <strong className="font-semibold text-on-frame">
+                  {person?.companyName}
+                </strong>{" "}
+                is setting up card payments with Surfboard. You&apos;re listed as
+                a director or owner, so the law requires us to confirm who you
+                are. It takes about two minutes.
               </p>
-              {personData?.dateOfBirth && (
-                <p className="text-sm text-muted-foreground">
-                  Born: {personData.dateOfBirth.month}/{personData.dateOfBirth.year}
-                </p>
-              )}
-              {personData?.nationality && (
-                <p className="text-sm text-muted-foreground">
-                  Nationality: {personData.nationality}
-                </p>
-              )}
-            </div>
-          </div>
+            </header>
 
-          {/* Form fields */}
-          <div className="space-y-6">
-            <DateOfBirthInput
-              label="Confirm your date of birth"
-              value={{
-                day: formData.dayOfBirth,
-                month: personData?.dateOfBirth?.month,
-                year: personData?.dateOfBirth?.year,
-              }}
-              onChange={(dob) =>
-                setFormData((prev) => ({ ...prev, dayOfBirth: dob.day }))
-              }
-              disabledFields={["month", "year"]}
-            />
+            <main className="rounded-[var(--radius-xl)] bg-surface p-6 shadow-[var(--shadow-card)] sm:p-8">
+              <div className="flex flex-col gap-7">
+                <section className="rounded-[var(--radius-md)] border border-ok-edge bg-ok-wash px-4 py-3.5">
+                  <p className="font-mono text-2xs uppercase tracking-[0.1em] text-ok">
+                    What we already have
+                  </p>
+                  <p className="mt-2 text-md text-ink">
+                    {[person?.firstName, person?.middleName, person?.lastName]
+                      .filter(Boolean)
+                      .join(" ")}
+                    {person?.dateOfBirth?.month && person?.dateOfBirth?.year && (
+                      <>
+                        , born{" "}
+                        {birthPhrase({
+                          month: person.dateOfBirth.month,
+                          year: person.dateOfBirth.year,
+                        })}
+                      </>
+                    )}
+                    {person?.nationality && <>, {person.nationality}</>}
+                  </p>
+                  <p className="mt-1 text-sm text-ink-muted">
+                    From the Companies House public register.
+                  </p>
+                </section>
 
-            <PhoneInput
-              label="Phone number"
-              value={formData.phone}
-              onChange={(v) => setFormData((prev) => ({ ...prev, phone: v }))}
-              required
-            />
+                {/* Lock only what the register actually gave us. Disabling an
+                    empty month and year would leave the invitee unable to
+                    finish, with no way to say so. */}
+                <DateOfBirthInput
+                  label="Your full date of birth"
+                  value={{
+                    day: form.dayOfBirth,
+                    month: person?.dateOfBirth?.month ?? form.monthOfBirth,
+                    year: person?.dateOfBirth?.year ?? form.yearOfBirth,
+                  }}
+                  onChange={(dob) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      dayOfBirth: dob.day,
+                      monthOfBirth: dob.month,
+                      yearOfBirth: dob.year,
+                    }))
+                  }
+                  disabledFields={
+                    knownBirthMonthYear ? ["month", "year"] : []
+                  }
+                  helperText={
+                    knownBirthMonthYear
+                      ? "Companies House only publishes the month and year, so we need the day."
+                      : undefined
+                  }
+                />
 
-            <Input
-              label="Email address"
-              type="email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, email: e.target.value }))
-              }
-              placeholder="your@email.com"
-              required
-            />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input
+                    label="Email address"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={form.email}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, email: e.target.value }))
+                    }
+                  />
+                  <PhoneInput
+                    label="Phone number"
+                    value={form.phone}
+                    onChange={(v) => setForm((prev) => ({ ...prev, phone: v }))}
+                  />
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Residential address
-              </label>
-              <AddressInput
-                value={formData.address}
-                onChange={(addr) =>
-                  setFormData((prev) => ({ ...prev, address: addr }))
-                }
-              />
-            </div>
+                <div className="flex flex-col gap-3">
+                  <p className="text-sm font-medium text-ink">Your home address</p>
+                  <AddressInput
+                    autoCompleteSection="invitee"
+                    value={form.address}
+                    onChange={(addr) => setForm((prev) => ({ ...prev, address: addr }))}
+                  />
+                </div>
 
-            {/* Submit */}
-            <div className="pt-4">
-              <Button
-                onClick={handleSubmit}
-                loading={step === "submitting"}
-                disabled={
-                  step === "submitting" ||
-                  !formData.dayOfBirth ||
-                  !formData.phone ||
-                  !formData.email ||
-                  !formData.address.addressLine1
-                }
-                className="w-full"
-                size="lg"
-              >
-                {step === "submitting" ? "Submitting…" : "Submit my details"}
-              </Button>
-            </div>
-          </div>
-        </motion.div>
-      </main>
+                <div className="flex flex-col gap-3 border-t border-line pt-6">
+                  <Button
+                    size="lg"
+                    onClick={handleSubmit}
+                    loading={step === "submitting"}
+                    disabled={step === "submitting" || missing}
+                    className="w-full"
+                  >
+                    {step === "submitting" ? "Sending your details" : "Send my details"}
+                  </Button>
+                  <p className="text-sm leading-relaxed text-ink-subtle">
+                    These details go to {person?.companyName || "the business"}
+                    &apos;s payment application and the acquiring bank that runs
+                    the checks. Nothing is shared with anyone else.
+                  </p>
+                </div>
+              </div>
+            </main>
+          </>
+        )}
+
+        <div className="mt-auto">
+          <PoweredBySurfboard />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Outcome({
+  tone,
+  title,
+  body,
+}: {
+  tone: "ok" | "warn" | "danger";
+  title: string;
+  body: React.ReactNode;
+}) {
+  const marks = {
+    ok: { ring: "border-ok-edge bg-ok-wash", ink: "text-ok", path: "m3 8.5 3.2 3.2L13 4.8" },
+    warn: {
+      ring: "border-warn-edge bg-warn-wash",
+      ink: "text-warn",
+      path: "M8 2.5v6M8 12.5v.5",
+    },
+    danger: {
+      ring: "border-danger-edge bg-danger-wash",
+      ink: "text-danger",
+      path: "m4 4 8 8M12 4l-8 8",
+    },
+  }[tone];
+
+  return (
+    <div className="flex flex-1 flex-col justify-center">
+      <div className="rounded-[var(--radius-xl)] bg-surface p-8 text-center shadow-[var(--shadow-card)]">
+        <span
+          className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full border ${marks.ring}`}
+          aria-hidden="true"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`h-6 w-6 ${marks.ink}`}
+          >
+            <path d={marks.path} />
+          </svg>
+        </span>
+        <h1 className="mt-5 font-display text-xl font-semibold tracking-[-0.02em] text-ink">
+          {title}
+        </h1>
+        <p className="mx-auto mt-2 max-w-[48ch] text-base leading-relaxed text-ink-muted">
+          {body}
+        </p>
+      </div>
     </div>
   );
 }

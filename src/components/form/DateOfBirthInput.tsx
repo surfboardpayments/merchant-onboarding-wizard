@@ -1,6 +1,8 @@
 "use client";
 
+import { useId } from "react";
 import { cn } from "@/lib/utils/cn";
+import { FieldMessage, fieldClasses } from "@/components/ui/Input";
 
 interface DateOfBirth {
   day?: number;
@@ -13,106 +15,77 @@ interface DateOfBirthInputProps {
   onChange: (dob: DateOfBirth) => void;
   error?: string;
   label?: string;
+  helperText?: string;
+  /** Companies House publishes month and year only; those arrive locked. */
   disabledFields?: ("day" | "month" | "year")[];
 }
+
+const PARTS = [
+  { key: "day", label: "Day", placeholder: "DD", min: 1, max: 31, width: "w-full" },
+  { key: "month", label: "Month", placeholder: "MM", min: 1, max: 12, width: "w-full" },
+  { key: "year", label: "Year", placeholder: "YYYY", min: 1900, max: 2015, width: "w-full" },
+] as const;
 
 export function DateOfBirthInput({
   value,
   onChange,
   error,
   label = "Date of birth",
+  helperText,
   disabledFields = [],
 }: DateOfBirthInputProps) {
-  const inputClass = cn(
-    "w-full px-3 py-2.5 text-sm border rounded-lg bg-white transition-colors text-center",
-    "placeholder:text-muted-foreground/60",
-    "focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-foreground",
-    error
-      ? "border-error focus:ring-error/20 focus:border-error"
-      : "border-border"
-  );
-
-  const disabledClass = "bg-muted text-muted-foreground cursor-not-allowed";
+  const groupId = useId();
+  const errorId = error ? `${groupId}-error` : undefined;
+  const helperId = helperText ? `${groupId}-helper` : undefined;
 
   return (
-    <div className="space-y-1.5">
-      {label && (
-        <label className="block text-sm font-medium text-foreground">
-          {label}
-        </label>
-      )}
-      <div className="grid grid-cols-3 gap-2">
-        <div>
-          <input
-            type="number"
-            min={1}
-            max={31}
-            value={value.day || ""}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                day: e.target.value ? parseInt(e.target.value) : undefined,
-              })
-            }
-            placeholder="DD"
-            className={cn(
-              inputClass,
-              disabledFields.includes("day") && disabledClass
-            )}
-            disabled={disabledFields.includes("day")}
-          />
-          <span className="text-xs text-muted-foreground mt-0.5 block text-center">
-            Day
-          </span>
-        </div>
-        <div>
-          <input
-            type="number"
-            min={1}
-            max={12}
-            value={value.month || ""}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                month: e.target.value ? parseInt(e.target.value) : undefined,
-              })
-            }
-            placeholder="MM"
-            className={cn(
-              inputClass,
-              disabledFields.includes("month") && disabledClass
-            )}
-            disabled={disabledFields.includes("month")}
-          />
-          <span className="text-xs text-muted-foreground mt-0.5 block text-center">
-            Month
-          </span>
-        </div>
-        <div>
-          <input
-            type="number"
-            min={1900}
-            max={2010}
-            value={value.year || ""}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                year: e.target.value ? parseInt(e.target.value) : undefined,
-              })
-            }
-            placeholder="YYYY"
-            className={cn(
-              inputClass,
-              disabledFields.includes("year") && disabledClass
-            )}
-            disabled={disabledFields.includes("year")}
-          />
-          <span className="text-xs text-muted-foreground mt-0.5 block text-center">
-            Year
-          </span>
-        </div>
+    <fieldset
+      className="flex flex-col gap-1.5"
+      aria-describedby={[errorId, helperId].filter(Boolean).join(" ") || undefined}
+    >
+      <legend className="mb-1.5 text-sm font-medium leading-snug text-ink">
+        {label}
+      </legend>
+      <div className="grid max-w-sm grid-cols-[1fr_1fr_1.4fr] gap-2">
+        {PARTS.map((part) => {
+          const disabled = disabledFields.includes(part.key);
+          const fieldId = `${groupId}-${part.key}`;
+          return (
+            <div key={part.key} className="flex flex-col gap-1">
+              <label
+                htmlFor={fieldId}
+                className="text-xs font-medium text-ink-muted"
+              >
+                {part.label}
+              </label>
+              <input
+                id={fieldId}
+                type="number"
+                inputMode="numeric"
+                min={part.min}
+                max={part.max}
+                value={value[part.key] ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    [part.key]: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                  })
+                }
+                placeholder={part.placeholder}
+                disabled={disabled}
+                aria-invalid={error ? true : undefined}
+                className={cn(fieldClasses(!!error), "h-11 px-3 text-center font-mono")}
+              />
+            </div>
+          );
+        })}
       </div>
-      {error && <p className="text-sm text-error">{error}</p>}
-    </div>
+      {error && (
+        <FieldMessage id={errorId} tone="error">
+          {error}
+        </FieldMessage>
+      )}
+      {helperText && !error && <FieldMessage id={helperId}>{helperText}</FieldMessage>}
+    </fieldset>
   );
 }

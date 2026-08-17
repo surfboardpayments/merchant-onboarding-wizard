@@ -1,67 +1,41 @@
 "use client";
 
-import { ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useRef, type ReactNode } from "react";
 
 interface StepContainerProps {
-  stepKey: number;
-  direction: number; // -1 = going back, 1 = going forward
+  stepKey: string;
   children: ReactNode;
-  title: string;
-  description?: string;
 }
 
-const variants = {
-  enter: (direction: number) => ({
-    x: direction > 0 ? 80 : -80,
-    opacity: 0,
-  }),
-  center: {
-    x: 0,
-    opacity: 1,
-  },
-  exit: (direction: number) => ({
-    x: direction > 0 ? -80 : 80,
-    opacity: 0,
-  }),
-};
+/**
+ * Steps cross-fade and settle rather than sliding sideways. A horizontal
+ * slide reads as "another page of this", which is exactly the feeling this
+ * redesign is trying to remove.
+ *
+ * Focus moves to the step so keyboard and screen-reader users land in the new
+ * content instead of at the top of the document.
+ */
+export function StepContainer({ stepKey, children }: StepContainerProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
 
-export function StepContainer({
-  stepKey,
-  direction,
-  children,
-  title,
-  description,
-}: StepContainerProps) {
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    ref.current?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [stepKey]);
+
   return (
-    <AnimatePresence mode="wait" custom={direction}>
-      <motion.div
-        key={stepKey}
-        custom={direction}
-        variants={variants}
-        initial="enter"
-        animate="center"
-        exit="exit"
-        transition={{
-          x: { type: "spring", stiffness: 300, damping: 30 },
-          opacity: { duration: 0.25 },
-        }}
-      >
-        {/* Step header */}
-        <div className="mb-8">
-          <h1 className="font-heading text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
-            {title}
-          </h1>
-          {description && (
-            <p className="mt-2 text-muted-foreground text-base">
-              {description}
-            </p>
-          )}
-        </div>
-
-        {/* Step content */}
-        <div className="space-y-6">{children}</div>
-      </motion.div>
-    </AnimatePresence>
+    <div
+      key={stepKey}
+      ref={ref}
+      tabIndex={-1}
+      className="animate-rise flex flex-col gap-9 outline-none"
+    >
+      {children}
+    </div>
   );
 }

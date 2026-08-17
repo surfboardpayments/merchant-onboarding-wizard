@@ -1,32 +1,39 @@
-import type { Metadata } from "next";
-import { Fira_Sans, Lexend, IBM_Plex_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Inter, Space_Grotesk, Space_Mono } from "next/font/google";
 import "./globals.css";
 
-const firaSans = Fira_Sans({
-  variable: "--font-fira-sans",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  display: "swap",
-});
+/* Brand type stack. Space Grotesk carries display and headings, Inter carries
+   body and UI, Space Mono carries metadata labels and reference numbers. */
 
-const lexend = Lexend({
-  variable: "--font-lexend",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
-const ibmPlexMono = IBM_Plex_Mono({
-  variable: "--font-ibm-plex-mono",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const spaceMono = Space_Mono({
+  variable: "--font-space-mono",
+  subsets: ["latin"],
+  weight: ["400", "700"],
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Merchant Onboarding | Surfboard Payments",
+  title: "Get set up | Surfboard Payments",
   description:
-    "Get started accepting payments with Surfboard. Quick, easy merchant onboarding.",
+    "Confirm your company details and start accepting payments with Surfboard.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#010927",
 };
 
 export default function RootLayout({
@@ -35,9 +42,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en-GB">
       <body
-        className={`${firaSans.variable} ${lexend.variable} ${ibmPlexMono.variable} antialiased`}
+        className={`${inter.variable} ${spaceGrotesk.variable} ${spaceMono.variable} antialiased`}
       >
         {children}
       </body>

@@ -1,166 +1,355 @@
 @import "tailwindcss";
 
-/* ─── Surfboard Payments Brand Tokens ─── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Surfboard Payments — merchant onboarding design tokens
+
+   Two grounds, one system:
+
+     FRAME    Deep Sea Blue. The brand shell: page background, page title,
+              progress, footer. Nothing on it is Ocean Blue text (2.7:1, a
+              pairing the brand guide bans outright).
+     SURFACE  Near-white. The work surface: every form, every fact, every
+              control. Reads as a trustworthy document in daylight, which is
+              where merchants actually fill this in.
+
+   All colours are OKLCH, all neutrals tinted toward the brand hue (264).
+   Every text pair below is verified ≥4.5:1 and every control edge ≥3:1.
+   ═══════════════════════════════════════════════════════════════════════ */
+
 :root {
-  /* Core colors */
-  --background: #ffffff;
-  --foreground: #0a0a0a;
-  --muted: #f5f7fa;
-  --muted-foreground: #6b7280;
-  --border: #e5e7eb;
-  --ring: #0e44e1;
+  /* ── Frame: the dark brand shell ─────────────────────────────────────── */
+  --frame:            oklch(15.51% 0.0645 262.8);  /* Deep Sea Blue  #010927 */
+  --frame-deep:       oklch(11.50% 0.0520 262.8);  /* gradient floor          */
+  --frame-lift:       oklch(34.46% 0.1777 264.8);  /* Deep Blue Sea  #092793 */
+  --on-frame:         oklch(100% 0 264);           /* 19.6:1                  */
+  --on-frame-muted:   oklch(90.34% 0.0346 267.6);  /* Light Blue  #D5DFF7 14.7:1 */
+  --on-frame-faint:   oklch(90.34% 0.0346 267.6 / 0.58);
+  --on-frame-line:    oklch(100% 0 264 / 0.14);
 
-  /* Surfboard brand blue */
-  --brand: #0e44e1;
-  --brand-dark: #0d33b8;
-  --brand-darker: #041669;
-  --brand-light: #eef2ff;
-  --brand-cyan: #04cdff;
+  /* ── Surface: the light work surface ─────────────────────────────────── */
+  --surface:          oklch(99.40% 0.0020 264);
+  --surface-sunk:     oklch(97.20% 0.0060 264);
+  --surface-veil:     oklch(94.50% 0.0090 264);
 
-  /* Primary uses brand blue */
-  --primary: #0e44e1;
-  --primary-foreground: #ffffff;
-  --secondary: #f5f7fa;
-  --secondary-foreground: #0a0a0a;
+  /* ── Ink ─────────────────────────────────────────────────────────────── */
+  --ink:              oklch(15.51% 0.0645 262.8);  /* 19.3:1 on surface */
+  --ink-muted:        oklch(46.00% 0.0280 264);    /*  7.0:1 */
+  --ink-subtle:       oklch(56.00% 0.0240 264);    /*  4.6:1 */
 
-  /* Header */
-  --header-bg: #0a0f1a;
-  --header-fg: #ffffff;
+  /* ── Lines ───────────────────────────────────────────────────────────── */
+  --line:             oklch(92.00% 0.0080 264);    /* dividers, decorative */
+  --line-strong:      oklch(86.00% 0.0130 264);    /* card edges           */
+  --field-line:       oklch(65.00% 0.0220 264);    /* 3.2:1 — control edges */
 
-  /* Status colors */
-  --success: #16a34a;
-  --success-light: #f0fdf4;
-  --warning: #ea580c;
-  --warning-light: #fff7ed;
-  --error: #dc2626;
-  --error-light: #fef2f2;
-  --info: #0e44e1;
-  --info-light: #eef2ff;
+  /* ── Accent: Ocean Blue ──────────────────────────────────────────────── */
+  --accent:           oklch(47.68% 0.2412 264);    /* #0E44E1  7.0:1 on surface */
+  --accent-hover:     oklch(41.00% 0.2150 264);
+  --accent-active:    oklch(35.00% 0.1850 264);
+  --accent-wash:      oklch(96.30% 0.0180 264);
+  --accent-edge:      oklch(88.00% 0.0480 264);
+  --accent-on-dark:   oklch(58.00% 0.2100 264);    /* 4.4:1 on frame — graphics only */
 
-  /* Spacing */
-  --radius: 0.75rem;
+  /* ── Coral Green. Accent on dark; darkened for legible ink on light. ─── */
+  --mint:             oklch(88.18% 0.2017 159.3);  /* #00FFA7  14.8:1 on frame */
+  --ok:               oklch(50.00% 0.1250 162);    /*  5.4:1 on surface        */
+  --ok-wash:          oklch(96.50% 0.0300 162);
+  --ok-edge:          oklch(87.00% 0.0700 162);
+
+  /* ── Signals. Meaning only, never decoration. ────────────────────────── */
+  --warn:             oklch(50.00% 0.1150 80);     /* 6.0:1 */
+  --warn-wash:        oklch(96.50% 0.0400 90);
+  --warn-edge:        oklch(87.00% 0.0900 90);
+  --danger:           oklch(52.00% 0.2100 15);     /* 6.0:1 */
+  --danger-wash:      oklch(96.00% 0.0250 15);
+  --danger-edge:      oklch(88.00% 0.0650 15);
+
+  /* ── Type scale. Fixed rem: this is product UI, not a marketing page. ── */
+  --text-2xs:  0.6875rem;  /* 11px — source tags, legal                      */
+  --text-xs:   0.75rem;    /* 12px — metadata, helper text                   */
+  --text-sm:   0.8125rem;  /* 13px — dense labels                            */
+  --text-base: 0.9375rem;  /* 15px — UI body, inputs                         */
+  --text-md:   1.0625rem;  /* 17px — confirmed facts. The reading size.      */
+  --text-lg:   1.25rem;    /* 20px — section headings inside the card        */
+  --text-xl:   1.5rem;     /* 24px — card-level headings                     */
+  --text-2xl:  2rem;       /* 32px — page title, mobile                      */
+  --text-3xl:  2.625rem;   /* 42px — page title, desktop                     */
+
+  /* ── Space. 4pt base. ────────────────────────────────────────────────── */
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs:  0.75rem;
+  --space-sm:  1rem;
+  --space-md:  1.5rem;
+  --space-lg:  2rem;
+  --space-xl:  3rem;
+  --space-2xl: 4rem;
+
+  /* ── Radius ──────────────────────────────────────────────────────────── */
+  --radius-xs: 0.375rem;
   --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
   --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
 
-  /* Glow effects (Surfboard brand) */
-  --glow-start: rgba(14, 68, 225, 0.15);
-  --glow-mid: rgba(14, 68, 225, 0.05);
-  --glow-end: rgba(14, 68, 225, 0);
-  --glow-depth: 120px;
+  /* ── Elevation. Tuned to read against the dark frame. ────────────────── */
+  --shadow-card:  0 1.5rem 3.75rem -1.25rem oklch(11.5% 0.052 263 / 0.55),
+                  0 0.125rem 0.5rem -0.25rem oklch(11.5% 0.052 263 / 0.28);
+  --shadow-pop:   0 0.75rem 2rem -0.75rem oklch(15.51% 0.0645 263 / 0.22),
+                  0 0.0625rem 0.1875rem oklch(15.51% 0.0645 263 / 0.10);
+  --shadow-press: inset 0 0.0625rem 0.125rem oklch(15.51% 0.0645 263 / 0.14);
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+  /* ── Motion. Exponential ease-out; no bounce, no elastic. ────────────── */
+  --ease-out:      cubic-bezier(0.25, 1, 0.5, 1);      /* quart */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);     /* quint */
+  --ease-in:       cubic-bezier(0.7, 0, 0.84, 0);
+  --dur-tap:    120ms;
+  --dur-state:  200ms;
+  --dur-reveal: 320ms;
+
+  /* ── Layering ────────────────────────────────────────────────────────── */
+  --z-dropdown: 100;
+  --z-sticky:   200;
+  --z-scrim:    300;
+  --z-dialog:   400;
+
+  /* ── Compatibility aliases for surfaces outside this redesign pass ───── */
+  --background: var(--surface);
+  --foreground: var(--ink);
+  --muted: var(--surface-sunk);
+  --muted-foreground: var(--ink-muted);
+  --border: var(--line);
+  --ring: var(--accent);
+  --radius: var(--radius-md);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-ring: var(--ring);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-brand: var(--brand);
-  --color-brand-dark: var(--brand-dark);
-  --color-brand-light: var(--brand-light);
-  --color-brand-cyan: var(--brand-cyan);
-  --color-header-bg: var(--header-bg);
-  --color-header-fg: var(--header-fg);
-  --color-success: var(--success);
-  --color-success-light: var(--success-light);
-  --color-warning: var(--warning);
-  --color-warning-light: var(--warning-light);
-  --color-error: var(--error);
-  --color-error-light: var(--error-light);
-  --color-info: var(--info);
-  --color-info-light: var(--info-light);
-  --font-sans: var(--font-fira-sans);
-  --font-heading: var(--font-lexend);
-  --font-mono: var(--font-ibm-plex-mono);
+  --color-frame: var(--frame);
+  --color-frame-deep: var(--frame-deep);
+  --color-frame-lift: var(--frame-lift);
+  --color-on-frame: var(--on-frame);
+  --color-on-frame-muted: var(--on-frame-muted);
+  --color-on-frame-faint: var(--on-frame-faint);
+  --color-on-frame-line: var(--on-frame-line);
+
+  --color-surface: var(--surface);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-surface-veil: var(--surface-veil);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-field-line: var(--field-line);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
+  --color-accent-wash: var(--accent-wash);
+  --color-accent-edge: var(--accent-edge);
+  --color-accent-on-dark: var(--accent-on-dark);
+
+  --color-mint: var(--mint);
+  --color-ok: var(--ok);
+  --color-ok-wash: var(--ok-wash);
+  --color-ok-edge: var(--ok-edge);
+  --color-warn: var(--warn);
+  --color-warn-wash: var(--warn-wash);
+  --color-warn-edge: var(--warn-edge);
+  --color-danger: var(--danger);
+  --color-danger-wash: var(--danger-wash);
+  --color-danger-edge: var(--danger-edge);
+
+  /* Compatibility */
+  --color-background: var(--surface);
+  --color-foreground: var(--ink);
+  --color-muted: var(--surface-sunk);
+  --color-muted-foreground: var(--ink-muted);
+  --color-border: var(--line);
+  --color-ring: var(--accent);
+
+  --text-2xs: var(--text-2xs);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-md: var(--text-md);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
+  --text-3xl: var(--text-3xl);
+
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-space-grotesk);
+  --font-mono: var(--font-space-mono);
+
+  --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
-  --radius-DEFAULT: var(--radius);
+  --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --ease-out: var(--ease-out);
+  --ease-out-soft: var(--ease-out-soft);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Base
+   ═══════════════════════════════════════════════════════════════════════ */
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.55;
+  font-kerning: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Surfboard Card Pop Animation ─── */
-@keyframes card-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.9) translateY(30px);
+h1, h2, h3, h4 {
+  font-family: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* Display sizes track tighter, per the brand type guidance. */
+.tracking-display { letter-spacing: -0.045em; }
+
+/* Numbers that sit in columns or get compared should not dance. */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   The frame — dark brand ground with a single light source above the fold
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.frame-ground {
+  background-color: var(--frame-deep);
+  background-image:
+    radial-gradient(
+      112% 62% at 50% -14%,
+      color-mix(in oklab, var(--frame-lift) 62%, transparent) 0%,
+      color-mix(in oklab, var(--frame-lift) 16%, transparent) 46%,
+      transparent 72%
+    );
+  background-repeat: no-repeat;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Focus — one ring, two grounds
+
+   Ocean Blue is the ring everywhere by default, because almost everything the
+   merchant touches sits on the white card. Only the handful of controls that
+   sit directly on Deep Sea Blue opt into the mint ring, via `data-on-frame`:
+   Ocean Blue on Deep Sea Blue is 2.7:1 and would be close to invisible.
+
+   These live in @layer base so a component can still override them with a
+   utility class.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
   }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
+
+  [data-on-frame] :focus-visible,
+  [data-on-frame]:focus-visible {
+    outline-color: var(--mint);
   }
 }
 
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes glow-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.8; }
-}
-
-.animate-card-pop {
-  animation: card-pop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-.animate-fade-in {
-  animation: fade-in 0.4s ease-out forwards;
-}
-
-.animate-slide-up {
-  animation: slide-up 0.5s ease-out forwards;
-}
-
-.animate-glow-pulse {
-  animation: glow-pulse 3s ease-in-out infinite;
-}
-
-/* Staggered animation delay for lists */
-.stagger-1 { animation-delay: 0.1s; }
-.stagger-2 { animation-delay: 0.2s; }
-.stagger-3 { animation-delay: 0.3s; }
-.stagger-4 { animation-delay: 0.4s; }
-.stagger-5 { animation-delay: 0.5s; }
-
-/* ─── Focus styles ─── */
-*:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
-/* ─── Selection ─── */
 ::selection {
-  background: var(--brand);
-  color: var(--primary-foreground);
+  background: var(--accent);
+  color: oklch(100% 0 264);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Motion primitives
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, 0.5rem, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes sweep {
+  from { transform: translate3d(-100%, 0, 0); }
+  to   { transform: translate3d(100%, 0, 0); }
+}
+
+.animate-rise {
+  animation: rise var(--dur-reveal) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+.animate-fade {
+  animation: fade var(--dur-state) var(--ease-out) both;
+}
+
+/* A single travelling highlight: used only while real work is in flight. */
+.is-working {
+  position: relative;
+  overflow: hidden;
+}
+
+.is-working::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--accent) 12%, transparent),
+    transparent
+  );
+  animation: sweep 1.5s var(--ease-out-soft) infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-rise { animation: fade 0.01ms both; }
+
+  /* Keep the signal, drop the travel. */
+  .is-working::after {
+    animation: none;
+    background: color-mix(in oklab, var(--accent) 8%, transparent);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Native control cleanup
+   ═══════════════════════════════════════════════════════════════════════ */
+
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
 }

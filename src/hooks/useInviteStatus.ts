@@ -44,10 +44,28 @@ export function useInviteStatus(targets: InviteTarget[]) {
   const [isPolling, setIsPolling] = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // The polling callback is created once and then read from a timer, so it
+  // reaches the latest targets through a ref. The ref is written in an effect,
+  // not during render, so a re-render that React discards cannot corrupt it.
   const targetsRef = useRef(targets);
-  targetsRef.current = targets;
+  useEffect(() => {
+    targetsRef.current = targets;
+  }, [targets]);
 
   // ── Fetch the latest statuses ───────────────────────────────────────────
+
+  /**
+   * Declared ahead of both callbacks: `fetchStatuses` needs to stop the timer
+   * when every invite reaches a terminal state, and reaching for `stopPolling`
+   * from there would read it before it exists.
+   */
+  const clearTimer = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
   const fetchStatuses = useCallback(async () => {
     const current = targetsRef.current;
@@ -73,12 +91,13 @@ export function useInviteStatus(targets: InviteTarget[]) {
       );
 
       if (allTerminal) {
-        stopPolling();
+        clearTimer();
+        setIsPolling(false);
       }
     } catch {
       // Silently swallow – we'll retry on the next interval.
     }
-  }, []);
+  }, [clearTimer]);
 
   // ── Polling lifecycle ───────────────────────────────────────────────────
 
@@ -91,14 +110,15 @@ export function useInviteStatus(targets: InviteTarget[]) {
   }, [fetchStatuses]);
 
   const stopPolling = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    clearTimer();
     setIsPolling(false);
-  }, []);
+  }, [clearTimer]);
 
   // Auto-start polling when we have active targets, auto-stop when we don't.
+  // The interval is an external system and `isPolling` only mirrors whether it
+  // is running, so setting it here is the effect doing its job rather than
+  // state derived from props.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (targets.length > 0) {
       startPolling();
@@ -108,6 +128,7 @@ export function useInviteStatus(targets: InviteTarget[]) {
 
     return stopPolling;
   }, [targets.length, startPolling, stopPolling]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return {
     statuses,

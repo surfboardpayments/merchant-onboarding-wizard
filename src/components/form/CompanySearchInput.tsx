@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils/cn";
 
 interface CompanyResult {
@@ -14,58 +14,84 @@ interface CompanyResult {
 
 interface CompanySearchInputProps {
   onSelect: (company: CompanyResult) => void;
+  /** Pre-fills the box when a company is already chosen. */
+  initialQuery?: string;
   placeholder?: string;
   error?: string;
+  disabled?: boolean;
 }
 
+const MIN_QUERY = 2;
+
+/**
+ * The first and most important control in the flow. Everything downstream is
+ * pre-filled from what this returns, so it gets the size and the prominence
+ * that importance deserves.
+ */
 export function CompanySearchInput({
   onSelect,
-  placeholder = "Search by company name or number...",
+  initialQuery = "",
+  placeholder = "Start typing your company name",
   error,
+  disabled = false,
 }: CompanySearchInputProps) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<CompanyResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [searched, setSearched] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestIdRef = useRef(0);
 
-  const searchCompanies = useCallback(async (q: string) => {
-    if (q.length < 2) {
+  const listboxId = useId();
+  const statusId = useId();
+
+  const search = useCallback(async (q: string) => {
+    if (q.trim().length < MIN_QUERY) {
       setResults([]);
       setIsOpen(false);
+      setSearched(false);
       return;
     }
 
+    const requestId = ++requestIdRef.current;
     setIsLoading(true);
+    setIsOpen(true);
+
     try {
       const response = await fetch(
-        `/api/companies-house/search?q=${encodeURIComponent(q)}`
+        `/api/companies-house/search?q=${encodeURIComponent(q)}`,
       );
-      if (response.ok) {
-        const data = await response.json();
-        setResults(data.results || []);
-        setIsOpen(true);
-      }
-    } catch (err) {
-      console.error("Search error:", err);
+      // A slow earlier request must not overwrite a fast later one.
+      if (requestId !== requestIdRef.current) return;
+
+      const data = response.ok ? await response.json() : { results: [] };
+      setResults(data.results || []);
+      setActiveIndex(-1);
+    } catch {
+      if (requestId !== requestIdRef.current) return;
+      setResults([]);
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+        setSearched(true);
+      }
     }
   }, []);
 
-  const handleInputChange = (value: string) => {
-    setQuery(value);
-    setSelectedIndex(-1);
-
+  const handleChange = (nextValue: string) => {
+    setQuery(nextValue);
+    setActiveIndex(-1);
+    setSearched(false);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => searchCompanies(value), 300);
+    debounceRef.current = setTimeout(() => search(nextValue), 280);
   };
 
-  const handleSelect = (company: CompanyResult) => {
+  const choose = (company: CompanyResult) => {
     setQuery(company.companyName);
     setIsOpen(false);
     setResults([]);
@@ -73,154 +99,206 @@ export function CompanySearchInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setIsOpen(false);
+      return;
+    }
     if (!isOpen || results.length === 0) return;
 
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.min(prev + 1, results.length - 1));
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.max(prev - 1, 0));
-        break;
-      case "Enter":
-        e.preventDefault();
-        if (selectedIndex >= 0) {
-          handleSelect(results[selectedIndex]);
-        }
-        break;
-      case "Escape":
-        setIsOpen(false);
-        break;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % results.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => (i <= 0 ? results.length - 1 : i - 1));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      choose(results[activeIndex]);
     }
   };
 
-  // Close dropdown on outside click
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+    const onPointerDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const showEmpty = isOpen && searched && !isLoading && results.length === 0;
 
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
         <svg
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
+          className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle"
+          viewBox="0 0 20 20"
           fill="none"
-          viewBox="0 0 24 24"
           stroke="currentColor"
-          strokeWidth={2}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          aria-hidden="true"
         >
-          <circle cx="11" cy="11" r="8" />
-          <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+          <circle cx="9" cy="9" r="6" />
+          <path d="m13.5 13.5 3.5 3.5" />
         </svg>
+
         <input
           ref={inputRef}
           type="text"
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
+          }
+          aria-describedby={statusId}
+          aria-invalid={error ? true : undefined}
+          autoComplete="off"
+          spellCheck={false}
           value={query}
-          onChange={(e) => handleInputChange(e.target.value)}
+          disabled={disabled}
+          onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => results.length > 0 && setIsOpen(true)}
           placeholder={placeholder}
           className={cn(
-            "w-full pl-10 pr-10 py-3 text-base border rounded-lg bg-white transition-colors",
-            "placeholder:text-muted-foreground/60",
-            "focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-foreground",
-            error
-              ? "border-error focus:ring-error/20 focus:border-error"
-              : "border-border"
+            "h-14 w-full rounded-[var(--radius-md)] border bg-surface pl-12 pr-12 text-md text-ink",
+            "placeholder:text-ink-subtle",
+            "transition-[border-color,box-shadow] duration-[var(--dur-tap)] ease-[var(--ease-out)]",
+            "hover:border-ink-subtle",
+            "focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-wash)] focus:outline-none",
+            "disabled:cursor-not-allowed disabled:bg-surface-sunk",
+            error ? "border-danger" : "border-field-line",
           )}
-          role="combobox"
-          aria-expanded={isOpen}
-          aria-autocomplete="list"
-          aria-controls="company-search-results"
         />
+
         {isLoading && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <svg
-              className="animate-spin w-4 h-4 text-muted-foreground"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
+          <span className="absolute right-4 top-1/2 -translate-y-1/2" aria-hidden="true">
+            <svg className="h-4 w-4 animate-spin text-ink-subtle" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-30" cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" />
+              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
-          </div>
+          </span>
+        )}
+
+        {!isLoading && query && (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              setResults([]);
+              setIsOpen(false);
+              setSearched(false);
+              inputRef.current?.focus();
+            }}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-[var(--radius-xs)] text-ink-subtle transition-colors duration-[var(--dur-tap)] hover:bg-surface-sunk hover:text-ink"
+          >
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="h-4 w-4" aria-hidden="true">
+              <path d="m4 4 8 8M12 4l-8 8" />
+            </svg>
+          </button>
         )}
       </div>
 
-      {/* Dropdown results */}
-      {isOpen && results.length > 0 && (
+      <p id={statusId} aria-live="polite" className="sr-only">
+        {isLoading
+          ? "Searching Companies House"
+          : searched
+            ? `${results.length} ${results.length === 1 ? "company" : "companies"} found`
+            : ""}
+      </p>
+
+      {error && (
+        <p role="alert" className="mt-1.5 text-xs text-danger">
+          {error}
+        </p>
+      )}
+
+      {isOpen && (isLoading || results.length > 0) && (
         <ul
-          ref={listRef}
-          id="company-search-results"
+          id={listboxId}
           role="listbox"
-          className="absolute z-50 w-full mt-1 bg-white border border-border rounded-lg shadow-lg max-h-80 overflow-y-auto"
+          aria-label="Company search results"
+          className={cn(
+            "absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[100]",
+            "max-h-[22rem] overflow-y-auto overscroll-contain",
+            "rounded-[var(--radius-md)] border border-line-strong bg-surface shadow-[var(--shadow-card)]",
+          )}
         >
-          {results.map((company, index) => (
-            <li
-              key={company.companyNumber}
-              role="option"
-              aria-selected={index === selectedIndex}
-              className={cn(
-                "px-4 py-3 cursor-pointer transition-colors border-b border-border/50 last:border-0",
-                index === selectedIndex
-                  ? "bg-muted"
-                  : "hover:bg-muted/50"
-              )}
-              onClick={() => handleSelect(company)}
-              onMouseEnter={() => setSelectedIndex(index)}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {company.companyName}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {company.companyNumber} &middot;{" "}
-                    {company.addressSnippet}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "text-xs px-2 py-0.5 rounded-full font-medium shrink-0",
-                    company.companyStatus === "active"
-                      ? "bg-success-light text-success"
-                      : "bg-error-light text-error"
-                  )}
-                >
-                  {company.companyStatus}
-                </span>
-              </div>
-            </li>
-          ))}
+          {isLoading && results.length === 0
+            ? // Skeletons preview the shape of what's coming; a spinner doesn't.
+              [0, 1, 2].map((i) => (
+                <li key={i} className="border-b border-line px-4 py-3.5 last:border-0">
+                  <div className="h-3.5 w-1/2 animate-pulse rounded bg-surface-veil" />
+                  <div className="mt-2 h-3 w-3/4 animate-pulse rounded bg-surface-sunk" />
+                </li>
+              ))
+            : results.map((company, index) => {
+                const active = index === activeIndex;
+                const isActive = company.companyStatus === "active";
+                return (
+                  <li
+                    key={company.companyNumber}
+                    id={`${listboxId}-option-${index}`}
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => choose(company)}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    className={cn(
+                      "cursor-pointer border-b border-line px-4 py-3.5 last:border-0",
+                      "transition-colors duration-[var(--dur-tap)]",
+                      active ? "bg-accent-wash" : "hover:bg-surface-sunk",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-medium text-ink">
+                          {company.companyName}
+                        </p>
+                        <p className="mt-0.5 truncate text-sm text-ink-muted">
+                          <span className="font-mono">{company.companyNumber}</span>
+                          {company.addressSnippet ? ` · ${company.addressSnippet}` : ""}
+                        </p>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+                          isActive ? "bg-ok-wash text-ok" : "bg-warn-wash text-warn",
+                        )}
+                      >
+                        {company.companyStatus?.replace(/-/g, " ")}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
         </ul>
       )}
 
-      {isOpen && query.length >= 2 && results.length === 0 && !isLoading && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-border rounded-lg shadow-lg p-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            No companies found for &quot;{query}&quot;
+      {showEmpty && (
+        <div
+          className={cn(
+            "absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[100]",
+            "rounded-[var(--radius-md)] border border-line-strong bg-surface px-4 py-4 shadow-[var(--shadow-card)]",
+          )}
+        >
+          <p className="text-base font-medium text-ink">
+            Nothing matched &ldquo;{query}&rdquo;
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-ink-muted">
+            Try your registered name rather than your trading name, or search by
+            your eight-digit company number.
           </p>
         </div>
       )}

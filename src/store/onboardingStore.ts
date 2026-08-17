@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
+import { FIRST_STEP, LAST_STEP } from '@/lib/constants/wizardSteps';
 
 // ---------------------------------------------------------------------------
 // Inline types (mirrors Zod schemas but all fields optional for progressive
@@ -254,6 +255,12 @@ export interface OnboardingState {
   // UI state
   isLoading: boolean;
   errors: Record<string, string>;
+  /**
+   * Autofill runs in the background from step 1 but its results land on step 2.
+   * Steps read this so a merchant who clicks through fast sees "still looking"
+   * rather than a page of blank fields that fill in underneath them.
+   */
+  autofillStatus: 'idle' | 'loading' | 'success' | 'error';
 }
 
 export interface OnboardingActions {
@@ -286,6 +293,7 @@ export interface OnboardingActions {
 
   // UI helpers
   setLoading: (loading: boolean) => void;
+  setAutofillStatus: (status: OnboardingState['autofillStatus']) => void;
   setError: (key: string, message: string) => void;
   clearError: (key: string) => void;
 
@@ -322,6 +330,7 @@ const createInitialState = (): OnboardingState => ({
   updatedAt: new Date().toISOString(),
   isLoading: false,
   errors: {},
+  autofillStatus: 'idle',
 });
 
 // ---------------------------------------------------------------------------
@@ -337,7 +346,7 @@ export const useOnboardingStore = create<OnboardingStore>()(
 
       setCurrentStep: (step) =>
         set({
-          currentStep: Math.min(Math.max(step, 1), 6),
+          currentStep: Math.min(Math.max(step, FIRST_STEP), LAST_STEP),
           updatedAt: new Date().toISOString(),
         }),
 
@@ -464,6 +473,8 @@ export const useOnboardingStore = create<OnboardingStore>()(
 
       setLoading: (loading) => set({ isLoading: loading }),
 
+      setAutofillStatus: (status) => set({ autofillStatus: status }),
+
       setError: (key, message) =>
         set((state) => ({
           errors: { ...state.errors, [key]: message },
@@ -471,7 +482,8 @@ export const useOnboardingStore = create<OnboardingStore>()(
 
       clearError: (key) =>
         set((state) => {
-          const { [key]: _, ...rest } = state.errors;
+          const rest = { ...state.errors };
+          delete rest[key];
           return { errors: rest };
         }),
 
@@ -491,6 +503,20 @@ export const useOnboardingStore = create<OnboardingStore>()(
       name: 'surfboard-onboarding',
       storage: createJSONStorage(() => localStorage),
       skipHydration: true,
+      // v1 was the six-step wizard. A draft saved on old step 4, 5 or 6 would
+      // otherwise rehydrate onto a step that no longer exists; map it onto the
+      // step that now covers the same ground. Collected data is untouched.
+      version: 2,
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<OnboardingState>;
+        if (version < 2 && typeof state.currentStep === 'number') {
+          const SIX_TO_THREE: Record<number, number> = {
+            1: 1, 2: 2, 3: 3, 4: 2, 5: 3, 6: 3,
+          };
+          state.currentStep = SIX_TO_THREE[state.currentStep] ?? FIRST_STEP;
+        }
+        return state as OnboardingState;
+      },
     },
   ),
 );

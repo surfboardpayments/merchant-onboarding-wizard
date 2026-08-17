@@ -2,6 +2,7 @@
 
 import { forwardRef, useId, type TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/utils/cn";
+import { FieldLabel, FieldMessage, fieldClasses } from "./Input";
 
 export interface TextAreaProps
   extends TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -12,25 +13,16 @@ export interface TextAreaProps
 
 const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
   (
-    {
-      className,
-      label,
-      error,
-      helperText,
-      id,
-      maxLength,
-      value,
-      defaultValue,
-      ...props
-    },
-    ref
+    { className, label, error, helperText, id, maxLength, value, defaultValue, ...props },
+    ref,
   ) => {
     const generatedId = useId();
     const textareaId = id ?? generatedId;
     const errorId = error ? `${textareaId}-error` : undefined;
     const helperId = helperText ? `${textareaId}-helper` : undefined;
+    const countId = maxLength ? `${textareaId}-count` : undefined;
     const describedBy =
-      [errorId, helperId].filter(Boolean).join(" ") || undefined;
+      [errorId, helperId, countId].filter(Boolean).join(" ") || undefined;
 
     const currentLength =
       typeof value === "string"
@@ -39,65 +31,53 @@ const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
           ? defaultValue.length
           : 0;
 
+    const nearLimit = maxLength ? currentLength > maxLength * 0.9 : false;
+
     return (
       <div className="flex flex-col gap-1.5">
-        {label && (
-          <label
-            htmlFor={textareaId}
-            className="text-sm font-medium text-foreground"
-          >
-            {label}
-          </label>
-        )}
+        {label && <FieldLabel htmlFor={textareaId}>{label}</FieldLabel>}
         <textarea
           ref={ref}
           id={textareaId}
+          rows={4}
           maxLength={maxLength}
           value={value}
           defaultValue={defaultValue}
           className={cn(
-            "min-h-[80px] w-full rounded-[var(--radius)] border bg-background px-3 py-2 text-sm text-foreground",
-            "placeholder:text-muted-foreground",
-            "transition-colors duration-150 resize-y",
-            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-            error ? "border-error focus:ring-error" : "border-border",
-            className
+            fieldClasses(!!error),
+            "min-h-24 resize-y px-3.5 py-3 leading-relaxed",
+            className,
           )}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           {...props}
         />
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
             {error && (
-              <p id={errorId} className="text-xs text-error" role="alert">
+              <FieldMessage id={errorId} tone="error">
                 {error}
-              </p>
+              </FieldMessage>
             )}
             {helperText && !error && (
-              <p id={helperId} className="text-xs text-muted-foreground">
-                {helperText}
-              </p>
+              <FieldMessage id={helperId}>{helperText}</FieldMessage>
             )}
           </div>
-          {maxLength != null && (
-            <p
+          {maxLength && (
+            <span
+              id={countId}
               className={cn(
-                "ml-auto text-xs",
-                currentLength >= maxLength
-                  ? "text-error"
-                  : "text-muted-foreground"
+                "tabular shrink-0 text-xs",
+                nearLimit ? "text-warn" : "text-ink-subtle",
               )}
-              aria-live="polite"
             >
               {currentLength}/{maxLength}
-            </p>
+            </span>
           )}
         </div>
       </div>
     );
-  }
+  },
 );
 
 TextArea.displayName = "TextArea";

@@ -1,7 +1,10 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useId } from "react";
 import { cn } from "@/lib/utils/cn";
+import { FieldLabel, FieldMessage, fieldClasses } from "@/components/ui/Input";
+
+const MAX_CHARS = 22;
 
 interface TransactionDescriptorInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
@@ -10,73 +13,84 @@ interface TransactionDescriptorInputProps
   onChange?: (value: string) => void;
 }
 
+/**
+ * The statement preview is not decoration. "Transaction descriptor" means
+ * nothing to a shop owner; a line that looks like their customer's banking app
+ * explains the field faster than any helper text could.
+ */
 export const TransactionDescriptorInput = forwardRef<
   HTMLInputElement,
   TransactionDescriptorInputProps
->(({ label, error, className, onChange, value, ...props }, ref) => {
-  const strValue = (value as string) || "";
-  const charCount = strValue.length;
-  const maxChars = 22;
+>(({ label, error, className, onChange, value, id, ...props }, ref) => {
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
+  const errorId = error ? `${inputId}-error` : undefined;
+  const previewId = `${inputId}-preview`;
+
+  const text = ((value as string) || "").toUpperCase();
+  const remaining = MAX_CHARS - text.length;
 
   return (
-    <div className="space-y-1.5">
-      {label && (
-        <label className="block text-sm font-medium text-foreground">
-          {label}
-          {props.required && <span className="text-error ml-0.5">*</span>}
-        </label>
-      )}
+    <div className="flex flex-col gap-1.5">
+      {label && <FieldLabel htmlFor={inputId}>{label}</FieldLabel>}
       <input
         ref={ref}
+        id={inputId}
         type="text"
+        autoComplete="off"
         value={value}
-        onChange={(e) => {
-          const v = e.target.value.slice(0, maxChars).toUpperCase();
-          onChange?.(v);
-        }}
-        maxLength={maxChars}
+        onChange={(e) => onChange?.(e.target.value.slice(0, MAX_CHARS).toUpperCase())}
+        maxLength={MAX_CHARS}
+        placeholder="ACME SPORTS LONDON"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={[errorId, previewId].filter(Boolean).join(" ")}
         className={cn(
-          "w-full px-3 py-2.5 text-sm border rounded-lg bg-white transition-colors font-mono uppercase tracking-wide",
-          "placeholder:text-muted-foreground/60 placeholder:normal-case placeholder:tracking-normal placeholder:font-sans",
-          "focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-foreground",
-          error
-            ? "border-error focus:ring-error/20 focus:border-error"
-            : "border-border",
-          className
+          fieldClasses(!!error),
+          "h-11 px-3.5 font-mono uppercase tracking-[0.04em]",
+          "placeholder:font-sans placeholder:normal-case placeholder:tracking-normal",
+          className,
         )}
-        placeholder="e.g. SURFBOARD*ACME"
         {...props}
       />
 
-      <div className="flex items-center justify-between">
+      <div className="flex justify-end">
         <span
           className={cn(
-            "text-xs",
-            charCount > maxChars ? "text-error" : "text-muted-foreground"
+            "tabular text-xs",
+            remaining < 0 ? "text-danger" : remaining <= 4 ? "text-warn" : "text-ink-subtle",
           )}
         >
-          {charCount}/{maxChars} characters
+          {remaining} character{remaining === 1 ? "" : "s"} left
         </span>
       </div>
 
-      {/* Statement preview */}
-      {strValue.length > 0 && (
-        <div className="mt-3 bg-muted rounded-lg p-4 border border-border/50">
-          <p className="text-xs text-muted-foreground mb-1.5">
-            How this appears on your customer&apos;s bank statement:
-          </p>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-mono font-medium text-foreground">
-              {strValue || "SURFBOARD*MERCHANT"}
-            </span>
-            <span className="text-sm font-mono text-muted-foreground">
-              -£XX.XX
-            </span>
-          </div>
+      <figure
+        id={previewId}
+        className="mt-1 overflow-hidden rounded-[var(--radius-md)] border border-line bg-surface-sunk"
+      >
+        <figcaption className="border-b border-line px-4 py-2 font-mono text-2xs uppercase tracking-[0.1em] text-ink-subtle">
+          Your customer&apos;s bank statement
+        </figcaption>
+        <div className="flex items-baseline justify-between gap-4 px-4 py-3.5">
+          <span
+            className={cn(
+              "truncate font-mono text-base font-bold tracking-[0.02em]",
+              text ? "text-ink" : "text-ink-subtle",
+            )}
+          >
+            {text || "ACME SPORTS LONDON"}
+          </span>
+          <span className="tabular shrink-0 font-mono text-base text-ink-muted">
+            &minus;£42.00
+          </span>
         </div>
-      )}
+      </figure>
 
-      {error && <p className="text-sm text-error">{error}</p>}
+      {error && (
+        <FieldMessage id={errorId} tone="error">
+          {error}
+        </FieldMessage>
+      )}
     </div>
   );
 });

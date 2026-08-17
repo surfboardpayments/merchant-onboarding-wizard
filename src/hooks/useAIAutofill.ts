@@ -53,6 +53,13 @@ export function useAIAutofill(): UseAIAutofillReturn {
   const dismiss = useCallback(() => {
     setStatus("idle");
     setFilledFields(0);
+    useOnboardingStore.getState().setAutofillStatus("idle");
+  }, []);
+
+  /** Mirror status into the store so later steps can read it too. */
+  const publish = useCallback((next: AutofillStatus) => {
+    setStatus(next);
+    useOnboardingStore.getState().setAutofillStatus(next);
   }, []);
 
   const triggerAutofill: UseAIAutofillReturn["triggerAutofill"] = useCallback(
@@ -65,7 +72,7 @@ export function useAIAutofill(): UseAIAutofillReturn {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      setStatus("loading");
+      publish("loading");
       setFilledFields(0);
 
       // Fire-and-forget async
@@ -80,13 +87,13 @@ export function useAIAutofill(): UseAIAutofillReturn {
 
           // 204 = no content, 503 = not configured — both are silent
           if (res.status === 204 || res.status === 503) {
-            setStatus("idle");
+            publish("idle");
             return;
           }
 
           if (!res.ok) {
             console.warn(`[AI Autofill] API returned ${res.status}`);
-            setStatus("error");
+            publish("error");
             return;
           }
 
@@ -290,18 +297,18 @@ export function useAIAutofill(): UseAIAutofillReturn {
           }
 
           setFilledFields(count);
-          setStatus(count > 0 ? "success" : "idle");
+          publish(count > 0 ? "success" : "idle");
         } catch (err) {
           if (err instanceof Error && err.name === "AbortError") {
             // Cancelled — new request incoming, stay quiet
             return;
           }
           console.warn("[AI Autofill] Client error:", err);
-          setStatus("error");
+          publish("error");
         }
       })();
     },
-    [],
+    [publish],
   );
 
   return { triggerAutofill, status, filledFields, dismiss };

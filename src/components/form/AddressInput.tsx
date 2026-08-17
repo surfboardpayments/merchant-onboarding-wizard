@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { cn } from "@/lib/utils/cn";
+import { Input } from "@/components/ui/Input";
+import { Checkbox } from "@/components/ui/Checkbox";
+import { Button } from "@/components/ui/Button";
 
 interface Address {
   addressLine1: string;
@@ -21,6 +24,8 @@ interface AddressInputProps {
   onSameAsChange?: (same: boolean) => void;
   isSameAs?: boolean;
   disabled?: boolean;
+  /** Maps to the autocomplete section token, e.g. "billing" or "shipping". */
+  autoCompleteSection?: string;
 }
 
 export function AddressInput({
@@ -32,12 +37,20 @@ export function AddressInput({
   onSameAsChange,
   isSameAs = false,
   disabled = false,
+  autoCompleteSection,
 }: AddressInputProps) {
-  const [postcodeLookupValue, setPostcodeLookupValue] = useState("");
+  const groupId = useId();
+  const [postcodeQuery, setPostcodeQuery] = useState("");
   const [isLookingUp, setIsLookingUp] = useState(false);
-  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupMessage, setLookupMessage] = useState<{
+    tone: "ok" | "error";
+    text: string;
+  } | null>(null);
 
-  const handleFieldChange = (field: keyof Address, fieldValue: string) => {
+  const ac = (token: string) =>
+    autoCompleteSection ? `section-${autoCompleteSection} ${token}` : token;
+
+  const set = (field: keyof Address, fieldValue: string) => {
     onChange({
       addressLine1: value.addressLine1 || "",
       addressLine2: value.addressLine2 || "",
@@ -49,146 +62,152 @@ export function AddressInput({
     });
   };
 
-  const handlePostcodeLookup = async () => {
-    if (!postcodeLookupValue.trim()) return;
+  const handleLookup = async () => {
+    const query = postcodeQuery.trim();
+    if (!query) return;
 
     setIsLookingUp(true);
-    setLookupError(null);
+    setLookupMessage(null);
 
     try {
       const response = await fetch(
-        `/api/postcode/lookup?postcode=${encodeURIComponent(postcodeLookupValue)}`
+        `/api/postcode/lookup?postcode=${encodeURIComponent(query)}`,
       );
-      if (response.ok) {
-        const data = await response.json();
-        onChange({
-          addressLine1: value.addressLine1 || "",
-          addressLine2: value.addressLine2 || "",
-          locality: data.address.adminDistrict || "",
-          region: data.address.region || "",
-          postalCode: data.address.postcode || postcodeLookupValue.toUpperCase(),
-          country: "United Kingdom",
+
+      if (!response.ok) {
+        setLookupMessage({
+          tone: "error",
+          text:
+            response.status === 404
+              ? "We couldn't find that postcode. Check it and try again, or fill the address in below."
+              : "The postcode lookup isn't responding. Fill the address in below instead.",
         });
-      } else {
-        setLookupError("Postcode not found");
+        return;
       }
+
+      const data = await response.json();
+      onChange({
+        addressLine1: value.addressLine1 || "",
+        addressLine2: value.addressLine2 || "",
+        locality: data.address.adminDistrict || data.address.locality || "",
+        region: data.address.region || "",
+        postalCode: data.address.postcode || query.toUpperCase(),
+        country: "United Kingdom",
+      });
+      setLookupMessage({
+        tone: "ok",
+        text: "Town and county filled in. Add your street address below.",
+      });
     } catch {
-      setLookupError("Failed to look up postcode");
+      setLookupMessage({
+        tone: "error",
+        text: "We couldn't reach the postcode service. Fill the address in below instead.",
+      });
     } finally {
       setIsLookingUp(false);
     }
   };
 
-  const inputClass = cn(
-    "w-full px-3 py-2.5 text-sm border rounded-lg bg-white transition-colors",
-    "placeholder:text-muted-foreground/60",
-    "focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-foreground",
-    "border-border",
-    disabled && "bg-muted text-muted-foreground cursor-not-allowed"
-  );
-
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-4">
       {showSameAsToggle && (
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isSameAs}
-            onChange={(e) => onSameAsChange?.(e.target.checked)}
-            className="w-4 h-4 rounded border-border text-foreground focus:ring-ring/20"
-          />
-          <span className="text-sm text-muted-foreground">{sameAsLabel}</span>
-        </label>
+        <Checkbox
+          label={sameAsLabel}
+          checked={isSameAs}
+          onChange={(e) => onSameAsChange?.(e.target.checked)}
+        />
       )}
 
       {!isSameAs && (
         <>
-          {/* Postcode lookup */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={postcodeLookupValue}
-              onChange={(e) =>
-                setPostcodeLookupValue(e.target.value.toUpperCase())
-              }
-              placeholder="Enter postcode to find address"
-              className={cn(inputClass, "flex-1")}
-              disabled={disabled}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handlePostcodeLookup();
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={handlePostcodeLookup}
-              disabled={disabled || isLookingUp || !postcodeLookupValue.trim()}
+          <div className="rounded-[var(--radius-md)] bg-surface-sunk p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <Input
+                label="Look up by postcode"
+                value={postcodeQuery}
+                onChange={(e) => setPostcodeQuery(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleLookup();
+                  }
+                }}
+                placeholder="SW1A 1AA"
+                autoComplete="off"
+                disabled={disabled}
+                className="font-mono uppercase placeholder:font-sans placeholder:normal-case"
+                id={`${groupId}-postcode-lookup`}
+              />
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={handleLookup}
+                loading={isLookingUp}
+                disabled={disabled || isLookingUp || !postcodeQuery.trim()}
+                className="shrink-0 sm:mb-0"
+              >
+                Fill in
+              </Button>
+            </div>
+            <p
+              aria-live="polite"
               className={cn(
-                "px-4 py-2.5 text-sm font-medium rounded-lg transition-colors shrink-0",
-                "bg-foreground text-primary-foreground hover:bg-foreground/90",
-                "disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
+                "mt-2 text-xs",
+                lookupMessage?.tone === "error" ? "text-danger" : "text-ok",
               )}
             >
-              {isLookingUp ? "Looking up..." : "Find"}
-            </button>
+              {lookupMessage?.text}
+            </p>
           </div>
-          {lookupError && (
-            <p className="text-sm text-error">{lookupError}</p>
-          )}
 
-          {/* Address fields */}
-          <div className="space-y-3">
-            <input
-              type="text"
+          <div className="flex flex-col gap-4">
+            <Input
+              label="Address line 1"
               value={value.addressLine1 || ""}
-              onChange={(e) => handleFieldChange("addressLine1", e.target.value)}
-              placeholder="Address line 1"
-              className={inputClass}
+              onChange={(e) => set("addressLine1", e.target.value)}
+              placeholder="12 High Street"
+              autoComplete={ac("address-line1")}
               disabled={disabled}
             />
-            <input
-              type="text"
+            <Input
+              label="Address line 2"
               value={value.addressLine2 || ""}
-              onChange={(e) => handleFieldChange("addressLine2", e.target.value)}
-              placeholder="Address line 2 (optional)"
-              className={inputClass}
+              onChange={(e) => set("addressLine2", e.target.value)}
+              placeholder="Optional"
+              autoComplete={ac("address-line2")}
               disabled={disabled}
             />
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                type="text"
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Town or city"
                 value={value.locality || ""}
-                onChange={(e) => handleFieldChange("locality", e.target.value)}
-                placeholder="Town / City"
-                className={inputClass}
+                onChange={(e) => set("locality", e.target.value)}
+                autoComplete={ac("address-level2")}
                 disabled={disabled}
               />
-              <input
-                type="text"
+              <Input
+                label="County"
                 value={value.region || ""}
-                onChange={(e) => handleFieldChange("region", e.target.value)}
-                placeholder="County (optional)"
-                className={inputClass}
+                onChange={(e) => set("region", e.target.value)}
+                placeholder="Optional"
+                autoComplete={ac("address-level1")}
                 disabled={disabled}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                type="text"
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Postcode"
                 value={value.postalCode || ""}
-                onChange={(e) => handleFieldChange("postalCode", e.target.value.toUpperCase())}
-                placeholder="Postcode"
-                className={inputClass}
+                onChange={(e) => set("postalCode", e.target.value.toUpperCase())}
+                autoComplete={ac("postal-code")}
                 disabled={disabled}
+                className="font-mono uppercase"
               />
-              <input
-                type="text"
+              <Input
+                label="Country"
                 value={value.country || "United Kingdom"}
-                onChange={(e) => handleFieldChange("country", e.target.value)}
-                placeholder="Country"
-                className={inputClass}
+                onChange={(e) => set("country", e.target.value)}
+                autoComplete={ac("country-name")}
                 disabled={disabled}
               />
             </div>
@@ -197,7 +216,9 @@ export function AddressInput({
       )}
 
       {error && (
-        <p className="text-sm text-error">{error}</p>
+        <p role="alert" className="text-xs text-danger">
+          {error}
+        </p>
       )}
     </div>
   );
